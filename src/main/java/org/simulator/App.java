@@ -36,5 +36,21 @@ public class App
 
         System.out.println(result);
 
+        MOJellyfishOptimizer mojs = new MOJellyfishOptimizer(
+                tasks, nodes, net,
+                30,      // population
+                50,      // iterations
+                40       // archive max
+        );
+
+        List<JellyfishSolution> pareto = mojs.run();
+
+        System.out.println("=== PARETO SOLUTIONS ===");
+        for (JellyfishSolution s : pareto) {
+            System.out.println(
+                    s.getF1() + " | " + s.getF2() + " | " + s.getF3()
+            );
+        }
+
     }
 }
