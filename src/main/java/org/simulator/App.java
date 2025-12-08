@@ -31,6 +31,8 @@ public class App
         List<Task> tasks = List.of(t1, t2);
         List<Node> nodes = List.of(fog, cloud);
 
+        tasks = Utils.topoSort(tasks);
+
         Simulator.SimulationResult result =
                 Simulator.simulate(tasks, nodes, assignment, net);
 

@@ -5,15 +5,18 @@ import java.util.Map;
 
 public class NetworkModel {
 
+    private final double costPerSecNetwork = 0.0001;
+
+
     private static class LinkKey {
         private final String from;
         private final String to;
+        // valeur par défaut, ajustable
 
         LinkKey(String from, String to) {
             this.from = from;
             this.to = to;
         }
-
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -43,5 +46,9 @@ public class NetworkModel {
 
     public double getBandwidth(String fromId, String toId) {
         return bandwidthMbps.getOrDefault(new LinkKey(fromId, toId), Double.POSITIVE_INFINITY);
+    }
+
+    public double getCostPerSecNetwork() {
+        return costPerSecNetwork;
     }
 }

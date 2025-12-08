@@ -40,4 +40,12 @@ public class Node {
     public double getPowerPerSec() {
         return powerPerSec;
     }
+
+    public boolean isFog() {
+        return this.type == Type.FOG;
+    }
+
+    public boolean isCloud() {
+        return this.type == Type.CLOUD;
+    }
 }

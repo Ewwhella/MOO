@@ -24,6 +24,12 @@ public class Simulator {
     ) {
         // indexation rapide : nodeId -> Node
         Map<String, Node> nodeById = new HashMap<>();
+        // instant où chaque nœud devient disponible (fin de la dernière tâche exécutée sur ce nœud)
+        Map<String, Double> nodeAvailableAt = new HashMap<>();
+        for (Node node : nodes) {
+            nodeAvailableAt.put(node.getId(), 0.0);
+        }
+
         for (Node node : nodes) {
             nodeById.put(node.getId(), node);
         }
@@ -74,6 +80,9 @@ public class Simulator {
                     double dataMB = pred.getOutputDataMB(); // simplification : même volume pour tous les successeurs
                     double transferTime = dataMB / bandwidth; // secondes
 
+                    double commCost = commTime * networkModel.getCostPerSecNetwork();
+                    totalCost += commCost;
+
                     commTime = latency + transferTime;
                 }
 
@@ -83,8 +92,15 @@ public class Simulator {
                 }
             }
 
-            double startTime = earliestStart;
+            // contrainte de ressource : la tâche ne peut démarrer que lorsque le nœud est libre
+            double resourceReady = nodeAvailableAt.get(nodeId);
+
+            // startTime = max(constraint DAG + communications, disponibilité du nœud)
+            double startTime = Math.max(earliestStart, resourceReady);
+
             double finishTime = startTime + execTimeSeconds;
+            nodeAvailableAt.put(nodeId, finishTime);
+
 
             startTimes.put(taskId, startTime);
             finishTimes.put(taskId, finishTime);
