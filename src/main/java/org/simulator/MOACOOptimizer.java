@@ -54,7 +54,7 @@ public class MOACOOptimizer {
         }
     }
 
-    private JellyfishSolution constructSolution() {
+    private SchedulingSolution constructSolution() {
         int[] assign = new int[tasks.size()];
 
         for (int i = 0; i < tasks.size(); i++) {
@@ -77,10 +77,10 @@ public class MOACOOptimizer {
             assign[i] = choice;
         }
 
-        return new JellyfishSolution(assign);
+        return new SchedulingSolution(assign);
     }
 
-    private void evaluate(JellyfishSolution sol) {
+    private void evaluate(SchedulingSolution sol) {
         Map<String, String> assignment = Utils.convert(sol.getAssignment(), tasks, nodes);
         Simulator.SimulationResult r = Simulator.simulate(tasks, nodes, assignment, network);
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
@@ -95,10 +95,10 @@ public class MOACOOptimizer {
         }
     }
 
-    private void deposit(List<JellyfishSolution> archive) {
+    private void deposit(List<SchedulingSolution> archive) {
         if (archive.isEmpty()) return;
 
-        for (JellyfishSolution s : archive) {
+        for (SchedulingSolution s : archive) {
             double q = 1.0 / (1.0 + s.getF1() + 100 * s.getF2() + 0.01 * s.getF3());
 
             int[] assign = s.getAssignment();
@@ -109,16 +109,16 @@ public class MOACOOptimizer {
         }
     }
 
-    public List<JellyfishSolution> run() {
+    public List<SchedulingSolution> run() {
 
-        List<JellyfishSolution> archive = new ArrayList<>();
+        List<SchedulingSolution> archive = new ArrayList<>();
 
         for (int iter = 1; iter <= maxIter; iter++) {
 
-            List<JellyfishSolution> ants = new ArrayList<>();
+            List<SchedulingSolution> ants = new ArrayList<>();
 
             for (int a = 0; a < antCount; a++) {
-                JellyfishSolution sol = constructSolution();
+                SchedulingSolution sol = constructSolution();
                 evaluate(sol);
                 ants.add(sol);
             }

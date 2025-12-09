@@ -42,3 +42,4 @@ misc/
 
 # Tous les fichiers CSV générés
 *.csv
+*.png

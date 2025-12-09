@@ -5,7 +5,7 @@ import java.util.List;
 
 public class ParetoUtils {
 
-    public static boolean dominates(JellyfishSolution a, JellyfishSolution b) {
+    public static boolean dominates(SchedulingSolution a, SchedulingSolution b) {
         boolean strictlyBetter = false;
 
         if (a.getF1() > b.getF1() || a.getF2() > b.getF2() || a.getF3() > b.getF3()) {
@@ -19,17 +19,17 @@ public class ParetoUtils {
         return strictlyBetter;
     }
 
-    public static List<JellyfishSolution> updateArchive(List<JellyfishSolution> archive, List<JellyfishSolution> population, int maxSize) {
+    public static List<SchedulingSolution> updateArchive(List<SchedulingSolution> archive, List<SchedulingSolution> population, int maxSize) {
 
-        List<JellyfishSolution> merged = new ArrayList<>();
+        List<SchedulingSolution> merged = new ArrayList<>();
         merged.addAll(archive);
         merged.addAll(population);
 
-        List<JellyfishSolution> newArchive = new ArrayList<>();
+        List<SchedulingSolution> newArchive = new ArrayList<>();
 
-        for (JellyfishSolution s : merged) {
+        for (SchedulingSolution s : merged) {
             boolean dominated = false;
-            for (JellyfishSolution t : merged) {
+            for (SchedulingSolution t : merged) {
                 if (t != s && dominates(t, s)) {
                     dominated = true;
                     break;

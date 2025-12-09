@@ -83,10 +83,10 @@ public class App {
         // =========================================================
 
         MOJellyfishOptimizer mojs = new MOJellyfishOptimizer(tasks, nodes, net, 40, 60, 50);
-        List<JellyfishSolution> paretoJS = mojs.run();
+        List<SchedulingSolution> paretoJS = mojs.run();
 
         MOACOOptimizer aco = new MOACOOptimizer(tasks, nodes, net, 40, 60, 50, 0.1, 1.0);
-        List<JellyfishSolution> paretoACO = aco.run();
+        List<SchedulingSolution> paretoACO = aco.run();
 
         // =========================================================
         // 5. BASELINES
@@ -94,11 +94,11 @@ public class App {
 
         // BASELINE 1 : RANDOM SELECTION
         RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100);
-        List<JellyfishSolution> paretoRandom = randomSel.run();
+        List<SchedulingSolution> paretoRandom = randomSel.run();
 
         // BASELINE 2 : GREEDY SELECTION
         GreedyAlgorithm greedy = new GreedyAlgorithm(tasks, nodes, net);
-        List<JellyfishSolution> paretoGreedy = greedy.run();
+        List<SchedulingSolution> paretoGreedy = greedy.run();
 
 
         // =========================================================
@@ -139,13 +139,13 @@ public class App {
     }
 
     // UTIL
-    private static void printPareto(String name, List<JellyfishSolution> pareto) {
+    private static void printPareto(String name, List<SchedulingSolution> pareto) {
         System.out.println("\n=== PARETO SOLUTIONS (" + name + ") ===");
         System.out.printf("%-4s %-12s %-15s %-12s%n", "#", "Makespan", "Cost", "Energy");
         System.out.println("---------------------------------------------------------");
 
         int idx = 1;
-        for (JellyfishSolution s : pareto) {
+        for (SchedulingSolution s : pareto) {
             System.out.printf("%-4d %-12.3f %-15.6f %-12.3f%n",
                     idx++, s.getF1(), s.getF2(), s.getF3());
         }

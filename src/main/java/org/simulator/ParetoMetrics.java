@@ -10,10 +10,10 @@ public class ParetoMetrics {
      * Hypervolume indicator (3D) : volume dominé jusqu'au point de référence.
      * On suppose minimisation de f1, f2, f3.
      */
-    public static double hypervolume(List<JellyfishSolution> sols, double[] ref) {
+    public static double hypervolume(List<SchedulingSolution> sols, double[] ref) {
         double hv = 0.0;
 
-        for (JellyfishSolution s : sols) {
+        for (SchedulingSolution s : sols) {
             double dx = Math.max(0, ref[0] - s.getF1());
             double dy = Math.max(0, ref[1] - s.getF2());
             double dz = Math.max(0, ref[2] - s.getF3());
@@ -27,7 +27,7 @@ public class ParetoMetrics {
      * Spacing metric :
      * Mesure la régularité de l'espacement des points du front Pareto.
      */
-    public static double spacing(List<JellyfishSolution> sols) {
+    public static double spacing(List<SchedulingSolution> sols) {
         List<Double> distances = new ArrayList<>();
 
         for (int i = 0; i < sols.size(); i++) {
@@ -57,10 +57,10 @@ public class ParetoMetrics {
     /**
      * Export CSV pour tracer les fronts Pareto (Python/Excel).
      */
-    public static void exportCSV(List<JellyfishSolution> sols, String file) {
+    public static void exportCSV(List<SchedulingSolution> sols, String file) {
         try (FileWriter fw = new FileWriter(file)) {
             fw.write("f1_makespan,f2_cost,f3_energy\n");
-            for (JellyfishSolution s : sols) {
+            for (SchedulingSolution s : sols) {
                 fw.write(s.getF1() + "," + s.getF2() + "," + s.getF3() + "\n");
             }
         } catch (Exception e) {

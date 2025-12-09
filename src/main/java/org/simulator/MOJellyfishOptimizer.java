@@ -29,15 +29,15 @@ public class MOJellyfishOptimizer {
     // ============================
     // Initialisation population
     // ============================
-    private JellyfishSolution randomSolution() {
+    private SchedulingSolution randomSolution() {
         int[] assign = new int[tasks.size()];
         for (int i = 0; i < assign.length; i++) {
             assign[i] = rand.nextInt(nodes.size());
         }
-        return new JellyfishSolution(assign);
+        return new SchedulingSolution(assign);
     }
 
-    private void evaluate(JellyfishSolution sol) {
+    private void evaluate(SchedulingSolution sol) {
         Map<String, String> assignmentMap = Utils.convert(sol.getAssignment(), tasks, nodes);
         Simulator.SimulationResult r = Simulator.simulate(tasks, nodes, assignmentMap, network);
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
@@ -46,18 +46,18 @@ public class MOJellyfishOptimizer {
     // ============================
     // Jellyfish Search crédible (Option 2)
     // ============================
-    public List<JellyfishSolution> run() {
+    public List<SchedulingSolution> run() {
 
         // Population initiale
-        List<JellyfishSolution> population = new ArrayList<>();
+        List<SchedulingSolution> population = new ArrayList<>();
         for (int i = 0; i < populationSize; i++) {
-            JellyfishSolution s = randomSolution();
+            SchedulingSolution s = randomSolution();
             evaluate(s);
             population.add(s);
         }
 
         // Archive Pareto initiale
-        List<JellyfishSolution> archive =
+        List<SchedulingSolution> archive =
                 ParetoUtils.updateArchive(new ArrayList<>(), population, archiveMaxSize);
 
         // Boucle principale
@@ -69,13 +69,13 @@ public class MOJellyfishOptimizer {
             double[] meanPos = computeMeanPosition(population);
 
             // "Meilleure" solution (scalaire simple sur f1,f2,f3)
-            JellyfishSolution best = selectBestScalar(archive.isEmpty() ? population : archive);
+            SchedulingSolution best = selectBestScalar(archive.isEmpty() ? population : archive);
             double[] bestPos = toDoubleArray(best.getAssignment());
 
-            List<JellyfishSolution> newPop = new ArrayList<>();
+            List<SchedulingSolution> newPop = new ArrayList<>();
 
             for (int i = 0; i < populationSize; i++) {
-                JellyfishSolution current = population.get(i);
+                SchedulingSolution current = population.get(i);
                 double[] curPos = toDoubleArray(current.getAssignment());
                 double[] newPos = new double[curPos.length];
 
@@ -109,7 +109,7 @@ public class MOJellyfishOptimizer {
                         }
                     } else {
                         // Mode oscillatoire entre deux solutions
-                        JellyfishSolution other = population.get(rand.nextInt(populationSize));
+                        SchedulingSolution other = population.get(rand.nextInt(populationSize));
                         double[] otherPos = toDoubleArray(other.getAssignment());
 
                         for (int d = 0; d < newPos.length; d++) {
@@ -124,7 +124,7 @@ public class MOJellyfishOptimizer {
                 // Discrétisation vers indices de nœuds valides
                 int[] disc = discretize(newPos, nodes.size());
 
-                JellyfishSolution child = new JellyfishSolution(disc);
+                SchedulingSolution child = new SchedulingSolution(disc);
                 evaluate(child);
                 newPop.add(child);
             }
@@ -158,13 +158,13 @@ public class MOJellyfishOptimizer {
         return r;
     }
 
-    private double[] computeMeanPosition(List<JellyfishSolution> pop) {
+    private double[] computeMeanPosition(List<SchedulingSolution> pop) {
         int dim = tasks.size();
         double[] mean = new double[dim];
 
         if (pop.isEmpty()) return mean;
 
-        for (JellyfishSolution s : pop) {
+        for (SchedulingSolution s : pop) {
             int[] a = s.getAssignment();
             for (int d = 0; d < dim; d++) {
                 mean[d] += a[d];
@@ -177,8 +177,8 @@ public class MOJellyfishOptimizer {
     }
 
     // Sélection scalaire simple pour choisir un "best" parmi archive/population
-    private JellyfishSolution selectBestScalar(List<JellyfishSolution> sols) {
-        JellyfishSolution best = sols.get(0);
+    private SchedulingSolution selectBestScalar(List<SchedulingSolution> sols) {
+        SchedulingSolution best = sols.get(0);
         double bestScore = scalarScore(best);
 
         for (int i = 1; i < sols.size(); i++) {
@@ -192,7 +192,7 @@ public class MOJellyfishOptimizer {
     }
 
     // Combinaison simple des 3 objectifs (pour guider le courant)
-    private double scalarScore(JellyfishSolution s) {
+    private double scalarScore(SchedulingSolution s) {
         return s.getF1() + 1000.0 * s.getF2() + 0.01 * s.getF3();
     }
 

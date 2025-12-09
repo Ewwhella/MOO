@@ -16,7 +16,7 @@ public class GreedyAlgorithm {
         this.net = net;
     }
 
-    public List<JellyfishSolution> run() {
+    public List<SchedulingSolution> run() {
 
         int[] assign = new int[tasks.size()];
 
@@ -49,10 +49,10 @@ public class GreedyAlgorithm {
         Simulator.SimulationResult r =
                 Simulator.simulate(tasks, nodes, map, net);
 
-        JellyfishSolution sol = new JellyfishSolution(assign);
+        SchedulingSolution sol = new SchedulingSolution(assign);
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
 
-        List<JellyfishSolution> list = new ArrayList<>();
+        List<SchedulingSolution> list = new ArrayList<>();
         list.add(sol);
         return list;
     }

@@ -19,9 +19,9 @@ public class RandomSelection {
         this.sampleCount = sampleCount;
     }
 
-    public List<JellyfishSolution> run() {
+    public List<SchedulingSolution> run() {
 
-        List<JellyfishSolution> sols = new ArrayList<>();
+        List<SchedulingSolution> sols = new ArrayList<>();
         Random rd = new Random();
 
         for (int s = 0; s < sampleCount; s++) {
@@ -36,7 +36,7 @@ public class RandomSelection {
             Simulator.SimulationResult r =
                     Simulator.simulate(tasks, nodes, map, net);
 
-            JellyfishSolution sol = new JellyfishSolution(assign);
+            SchedulingSolution sol = new SchedulingSolution(assign);
             sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
 
             sols.add(sol);
