@@ -23,7 +23,6 @@ public class MOACOOptimizer {
     private final int archiveMaxSize;
 
     private final double evaporation;
-    private final double initialPheromone;
 
     private final double[][] pheromone;    // pheromone[tâche][nodeIndex]
 
@@ -46,7 +45,6 @@ public class MOACOOptimizer {
         this.maxIter = maxIter;
         this.archiveMaxSize = archiveMaxSize;
         this.evaporation = evaporation;
-        this.initialPheromone = initialPheromone;
 
         pheromone = new double[tasks.size()][nodes.size()];
         for (int i = 0; i < tasks.size(); i++) {
