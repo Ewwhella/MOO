@@ -80,10 +80,10 @@ public class Simulator {
                     double dataMB = pred.getOutputDataMB(); // simplification : même volume pour tous les successeurs
                     double transferTime = dataMB / bandwidth; // secondes
 
+                    commTime = latency + transferTime;
+
                     double commCost = commTime * networkModel.getCostPerSecNetwork();
                     totalCost += commCost;
-
-                    commTime = latency + transferTime;
                 }
 
                 double candidateStart = predFinish + commTime;

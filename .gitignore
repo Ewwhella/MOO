@@ -36,3 +36,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Dossier misc/ (tout ce qu'il y a dedans)
+misc/
+
+# Tous les fichiers CSV générés
+*.csv
