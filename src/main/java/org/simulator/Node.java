@@ -4,7 +4,8 @@ public class Node {
 
     public enum Type {
         FOG,
-        CLOUD
+        CLOUD,
+        EDGE
     }
 
     private final String id;
@@ -47,5 +48,9 @@ public class Node {
 
     public boolean isCloud() {
         return this.type == Type.CLOUD;
+    }
+
+    public boolean isEdge() {
+        return this.type == Type.EDGE;
     }
 }
