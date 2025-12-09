@@ -126,10 +126,27 @@ public class App
         List<JellyfishSolution> pareto = mojs.run();
 
         // =========================================================
-        // 7. CLEAN PARETO OUTPUT
+        // 7. SECOND METAHEURISTIC (MO-ACO)
         // =========================================================
 
-        System.out.println("\n=== PARETO SOLUTIONS ===");
+        MOACOOptimizer aco = new MOACOOptimizer(
+                tasks,
+                nodes,
+                net,
+                40,     // ant count
+                60,     // iterations
+                50,     // archive max
+                0.1,    // evaporation
+                1.0     // initial pheromone
+        );
+
+        List<JellyfishSolution> paretoACO = aco.run();
+
+        // =========================================================
+        // 8. CLEAN PARETO OUTPUT
+        // =========================================================
+
+        System.out.println("\n=== PARETO SOLUTIONS (MOJS) ===");
         System.out.printf("%-4s %-12s %-15s %-12s%n",
                 "#", "Makespan", "Cost", "Energy");
         System.out.println("---------------------------------------------------------");
@@ -144,5 +161,48 @@ public class App
                     s.getF3()
             );
         }
+        System.out.println("\n=== PARETO SOLUTIONS (MO-ACO) ===");
+        System.out.printf("%-4s %-12s %-15s %-12s%n",
+                "#", "Makespan", "Cost", "Energy");
+        System.out.println("---------------------------------------------------------");
+
+        idx = 1;
+        for (JellyfishSolution s : paretoACO) {
+            System.out.printf(
+                    "%-4d %-12.3f %-15.6f %-12.3f%n",
+                    idx++,
+                    s.getF1(),
+                    s.getF2(),
+                    s.getF3()
+            );
+        }
+        // =========================================================
+        //  PERFORMANCE METRICS (Hypervolume + Spacing)
+        // =========================================================
+
+        // Point de référence dominé par toutes les solutions (à adapter si nécessaire)
+        double[] refPoint = {100.0, 1.0, 5000.0};
+
+        // Hypervolume
+        double hvJS  = ParetoMetrics.hypervolume(pareto, refPoint);
+        double hvACO = ParetoMetrics.hypervolume(paretoACO, refPoint);
+
+        // Spacing
+        double spJS  = ParetoMetrics.spacing(pareto);
+        double spACO = ParetoMetrics.spacing(paretoACO);
+
+        System.out.println("\n=== PERFORMANCE METRICS ===");
+        System.out.println("Hypervolume (MOJS):  " + hvJS);
+        System.out.println("Hypervolume (ACO):   " + hvACO);
+        System.out.println("Spacing (MOJS):      " + spJS);
+        System.out.println("Spacing (ACO):       " + spACO);
+
+        // Export CSV
+        ParetoMetrics.exportCSV(pareto,    "pareto_mojs.csv");
+        ParetoMetrics.exportCSV(paretoACO, "pareto_aco.csv");
+
+        System.out.println("\nCSV exported: pareto_mojs.csv, pareto_aco.csv");
+
+
     }
 }
