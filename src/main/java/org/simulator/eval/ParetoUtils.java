@@ -1,4 +1,6 @@
-package org.simulator;
+package org.simulator.eval;
+
+import org.simulator.core.SchedulingSolution;
 
 import java.util.ArrayList;
 import java.util.List;

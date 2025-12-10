@@ -1,4 +1,13 @@
-package org.simulator;
+package org.simulator.algo;
+
+import org.simulator.core.NetworkModel;
+import org.simulator.core.Node;
+import org.simulator.core.SchedulingSolution;
+import org.simulator.core.Task;
+import org.simulator.eval.ParetoMetrics;
+import org.simulator.eval.ParetoUtils;
+import org.simulator.sim.Simulator;
+import org.simulator.util.Utils;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,4 +1,7 @@
-package org.simulator;
+package org.simulator.util;
+
+import org.simulator.core.Node;
+import org.simulator.core.Task;
 
 import java.util.*;
 

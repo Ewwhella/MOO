@@ -1,5 +1,7 @@
-package org.simulator;
+package org.simulator.io;
 
+import org.simulator.core.Task;
+import org.simulator.util.Utils;
 import org.w3c.dom.*;
 import javax.xml.parsers.*;
 import java.io.File;

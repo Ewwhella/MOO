@@ -1,4 +1,7 @@
-package org.simulator;
+package org.simulator.core;
+
+import org.simulator.io.DaxParser;
+import org.simulator.util.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
