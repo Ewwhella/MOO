@@ -7,17 +7,31 @@ import java.util.Random;
 
 public class MOJellyfishOptimizer {
 
+    // Paramètres de l’algorithme
     private final int populationSize;
     private final int maxIter;
     private final int archiveMaxSize;
+
+    private final double mutationRate = 0.10;   // probabilité de mutation par gène
+    private final double restartRatio = 0.20;   // fraction de la population réinitialisée en cas de stagnation
+    private final int stagnationLimit = 8;      // nb d’itérations sans gain d’hypervolume avant restart
+
     private final Random rand = new Random();
 
     private final List<Task> tasks;
     private final List<Node> nodes;
     private final NetworkModel network;
 
-    public MOJellyfishOptimizer(List<Task> tasks, List<Node> nodes, NetworkModel network,
-                                int populationSize, int maxIter, int archiveMaxSize) {
+    // historique d’hypervolume pour le tracé
+    private final List<Double> hypervolumeHistory = new ArrayList<>();
+    public List<Double> getHypervolumeHistory() { return hypervolumeHistory; }
+
+    public MOJellyfishOptimizer(List<Task> tasks,
+                                List<Node> nodes,
+                                NetworkModel network,
+                                int populationSize,
+                                int maxIter,
+                                int archiveMaxSize) {
         this.tasks = tasks;
         this.nodes = nodes;
         this.network = network;
@@ -26,9 +40,10 @@ public class MOJellyfishOptimizer {
         this.archiveMaxSize = archiveMaxSize;
     }
 
-    // ============================
-    // Initialisation population
-    // ============================
+    // ----------------------------------------------------------------------
+    // Construction / évaluation d’une solution
+    // ----------------------------------------------------------------------
+
     private SchedulingSolution randomSolution() {
         int[] assign = new int[tasks.size()];
         for (int i = 0; i < assign.length; i++) {
@@ -38,14 +53,17 @@ public class MOJellyfishOptimizer {
     }
 
     private void evaluate(SchedulingSolution sol) {
-        Map<String, String> assignmentMap = Utils.convert(sol.getAssignment(), tasks, nodes);
-        Simulator.SimulationResult r = Simulator.simulate(tasks, nodes, assignmentMap, network);
+        Map<String, String> assignmentMap =
+                Utils.convert(sol.getAssignment(), tasks, nodes);
+        Simulator.SimulationResult r =
+                Simulator.simulate(tasks, nodes, assignmentMap, network);
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
     }
 
-    // ============================
-    // Jellyfish Search crédible (Option 2)
-    // ============================
+    // ----------------------------------------------------------------------
+    // Algorithme Jellyfish
+    // ----------------------------------------------------------------------
+
     public List<SchedulingSolution> run() {
 
         // Population initiale
@@ -56,21 +74,21 @@ public class MOJellyfishOptimizer {
             population.add(s);
         }
 
-        // Archive Pareto initiale
+        // Archive Pareto
         List<SchedulingSolution> archive =
                 ParetoUtils.updateArchive(new ArrayList<>(), population, archiveMaxSize);
 
-        // Boucle principale
+        double prevHv = 0.0;
+        int stagnationCounter = 0;
+        double[] refPoint = {100.0, 1.0, 5000.0};
+
         for (int iter = 1; iter <= maxIter; iter++) {
 
-            double tNorm = (double) iter / maxIter;
-
-            // Centre du banc (moyenne des positions)
+            double t = (double) iter / maxIter;           // temps normalisé [0,1]
             double[] meanPos = computeMeanPosition(population);
-
-            // "Meilleure" solution (scalaire simple sur f1,f2,f3)
-            SchedulingSolution best = selectBestScalar(archive.isEmpty() ? population : archive);
-            double[] bestPos = toDoubleArray(best.getAssignment());
+            SchedulingSolution guide =
+                    selectBestScalar(archive.isEmpty() ? population : archive);
+            double[] guidePos = toDoubleArray(guide.getAssignment());
 
             List<SchedulingSolution> newPop = new ArrayList<>();
 
@@ -79,67 +97,78 @@ public class MOJellyfishOptimizer {
                 double[] curPos = toDoubleArray(current.getAssignment());
                 double[] newPos = new double[curPos.length];
 
-                boolean activePhase = rand.nextDouble() < tNorm; // début : plutôt passif, fin : plutôt actif
+                // probabilité d’être en phase ACTIVE augmente avec t
+                boolean activePhase = rand.nextDouble() < t;
 
                 if (!activePhase) {
-                    // ============================
-                    // Phase PASSIVE
-                    // ============================
-                    // X_{t+1} = X_t + r * (X_mean - X_t) + petite perturbation
+                    // Phase passive : attraction vers le centre + petite perturbation Lévy
                     for (int d = 0; d < newPos.length; d++) {
                         double r1 = rand.nextDouble();
                         double drift = r1 * (meanPos[d] - curPos[d]);
-                        double noise = levySmall() * (rand.nextDouble() - 0.5);
+                        double noise = 0.15 * levySmall();   // exploration douce
                         newPos[d] = curPos[d] + drift + noise;
                     }
                 } else {
-                    // ============================
-                    // Phase ACTIVE
-                    // ============================
-                    // Deux modes : se diriger vers "best" ou interagir avec une autre méduse
-                    boolean towardBest = rand.nextBoolean();
+                    // Phase active : soit vers le guide global, soit vers une autre méduse
+                    boolean towardGuide = rand.nextDouble() < 0.6;
 
-                    if (towardBest) {
-                        // Mode courant / attraction vers best
-                        // X_{t+1} = X_t + r * (X_best - X_t)
+                    if (towardGuide) {
+                        // mouvement vers la meilleure solution actuelle
                         for (int d = 0; d < newPos.length; d++) {
                             double r2 = rand.nextDouble();
-                            double currentTerm = r2 * (bestPos[d] - curPos[d]);
-                            newPos[d] = curPos[d] + currentTerm;
+                            double step = 0.5 * r2 * (guidePos[d] - curPos[d]);
+                            newPos[d] = curPos[d] + step;
                         }
                     } else {
-                        // Mode oscillatoire entre deux solutions
-                        SchedulingSolution other = population.get(rand.nextInt(populationSize));
+                        // interaction avec une autre solution
+                        SchedulingSolution other =
+                                population.get(rand.nextInt(populationSize));
                         double[] otherPos = toDoubleArray(other.getAssignment());
-
                         for (int d = 0; d < newPos.length; d++) {
                             double r3 = rand.nextDouble();
                             double diff = otherPos[d] - curPos[d];
-                            double osc = levySmall() * Math.signum(diff);
-                            newPos[d] = curPos[d] + r3 * diff + osc;
+                            double oscillation = 0.25 * levySmall() * Math.signum(diff);
+                            newPos[d] = curPos[d] + r3 * diff + oscillation;
                         }
                     }
                 }
 
-                // Discrétisation vers indices de nœuds valides
-                int[] disc = discretize(newPos, nodes.size());
+                // Discrétisation + mutation
+                int[] discrete = discretize(newPos, nodes.size());
+                mutate(discrete);
 
-                SchedulingSolution child = new SchedulingSolution(disc);
+                SchedulingSolution child = new SchedulingSolution(discrete);
                 evaluate(child);
                 newPop.add(child);
             }
 
             population = newPop;
-
             archive = ParetoUtils.updateArchive(archive, population, archiveMaxSize);
+
+            // Hypervolume
+            double hv = ParetoMetrics.hypervolume(archive, refPoint);
+            hypervolumeHistory.add(hv);
+
+            if (hv > prevHv + 1e-6) {
+                prevHv = hv;
+                stagnationCounter = 0;
+            } else {
+                stagnationCounter++;
+            }
+
+            // mini-restart si stagnation prolongée
+            if (stagnationCounter >= stagnationLimit) {
+                partialRestart(population);
+                stagnationCounter = 0;
+            }
         }
 
         return archive;
     }
 
-    // ============================
-    // Helpers numériques
-    // ============================
+    // ----------------------------------------------------------------------
+    // Outils numériques
+    // ----------------------------------------------------------------------
 
     private double[] toDoubleArray(int[] a) {
         double[] x = new double[a.length];
@@ -158,10 +187,27 @@ public class MOJellyfishOptimizer {
         return r;
     }
 
+    private void mutate(int[] assign) {
+        for (int i = 0; i < assign.length; i++) {
+            if (rand.nextDouble() < mutationRate) {
+                assign[i] = rand.nextInt(nodes.size());
+            }
+        }
+    }
+
+    private void partialRestart(List<SchedulingSolution> pop) {
+        int count = Math.max(1, (int) Math.round(pop.size() * restartRatio));
+        for (int c = 0; c < count; c++) {
+            int idx = rand.nextInt(pop.size());
+            SchedulingSolution s = randomSolution();
+            evaluate(s);
+            pop.set(idx, s);
+        }
+    }
+
     private double[] computeMeanPosition(List<SchedulingSolution> pop) {
         int dim = tasks.size();
         double[] mean = new double[dim];
-
         if (pop.isEmpty()) return mean;
 
         for (SchedulingSolution s : pop) {
@@ -176,7 +222,6 @@ public class MOJellyfishOptimizer {
         return mean;
     }
 
-    // Sélection scalaire simple pour choisir un "best" parmi archive/population
     private SchedulingSolution selectBestScalar(List<SchedulingSolution> sols) {
         SchedulingSolution best = sols.get(0);
         double bestScore = scalarScore(best);
@@ -191,28 +236,27 @@ public class MOJellyfishOptimizer {
         return best;
     }
 
-    // Combinaison simple des 3 objectifs (pour guider le courant)
+    // agrégation simple des 3 objectifs
     private double scalarScore(SchedulingSolution s) {
         return s.getF1() + 1000.0 * s.getF2() + 0.01 * s.getF3();
     }
 
-    // "Lévy-like" simple : petit pas lourd-taillé
+    // pas Lévy "light"
     private double levySmall() {
         double u = rand.nextGaussian();
         double v = rand.nextGaussian();
-        double beta = 1.5; // paramètre Lévy
+        double beta = 1.5;
         double sigma = Math.pow(
                 gamma(1 + beta) * Math.sin(Math.PI * beta / 2) /
-                        (gamma((1 + beta) / 2) * beta * Math.pow(2, (beta - 1) / 2))
-                , 1.0 / beta);
+                        (gamma((1 + beta) / 2) * beta * Math.pow(2, (beta - 1) / 2)),
+                1.0 / beta
+        );
         double step = u * sigma / Math.pow(Math.abs(v), 1.0 / beta);
-        // on réduit fortement l'amplitude pour rester local
-        return 0.1 * step;
+        return step;
     }
 
-    // Approximation Gamma simple pour beta=1.5 (pas critique ici)
+    // Gamma approchée (Lanczos)
     private double gamma(double x) {
-        // Approximation de Lanczos très grossière mais suffisante pour ce contexte
         double[] p = {
                 676.5203681218851,
                 -1259.1392167224028,
@@ -233,6 +277,8 @@ public class MOJellyfishOptimizer {
             a += p[i] / (x + i + 1);
         }
         double t = x + g + 0.5;
-        return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+        return Math.sqrt(2 * Math.PI) *
+                Math.pow(t, x + 0.5) *
+                Math.exp(-t) * a;
     }
 }

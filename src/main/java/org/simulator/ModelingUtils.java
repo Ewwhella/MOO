@@ -1,6 +1,7 @@
 package org.simulator;
 
 import java.io.BufferedReader;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.util.List;
 
@@ -41,10 +42,22 @@ public class ModelingUtils {
         System.out.println("GREEDY : " + ParetoMetrics.spacing(greedy));
     }
 
+    public static void exportHypervolumeCSV(List<Double> hvList, String filename) {
+        try (FileWriter fw = new FileWriter(filename)) {
+            fw.write("generation,hypervolume\n");
+            for (int i = 0; i < hvList.size(); i++) {
+                fw.write(i + "," + hvList.get(i) + "\n");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
     // Call the Python plotting script
     public static void runPythonPlot() {
         try {
-            String pythonExe = "python";  // replace with python3 if needed
+            String pythonExe = "py";  // replace with python3 if needed
 
             ProcessBuilder pb = new ProcessBuilder(
                     pythonExe,

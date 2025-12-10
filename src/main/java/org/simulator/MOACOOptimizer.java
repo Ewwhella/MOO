@@ -26,6 +26,9 @@ public class MOACOOptimizer {
 
     private final double[][] pheromone;    // pheromone[tâche][nodeIndex]
 
+    private final List<Double> hypervolumeHistory = new ArrayList<>();
+    public List<Double> getHypervolumeHistory() { return hypervolumeHistory; }
+
     private final Random rand = new Random();
 
     public MOACOOptimizer(
@@ -124,6 +127,11 @@ public class MOACOOptimizer {
             }
 
             archive = ParetoUtils.updateArchive(archive, ants, archiveMaxSize);
+
+            // === TRACK HYPERVOLUME ===
+            double[] refPoint = {100.0, 1.0, 5000.0};
+            double hv = ParetoMetrics.hypervolume(archive, refPoint);
+            hypervolumeHistory.add(hv);
 
             evaporate();
             deposit(archive);

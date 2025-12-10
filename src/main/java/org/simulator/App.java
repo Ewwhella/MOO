@@ -84,9 +84,11 @@ public class App {
 
         MOJellyfishOptimizer mojs = new MOJellyfishOptimizer(tasks, nodes, net, 40, 60, 50);
         List<SchedulingSolution> paretoJS = mojs.run();
+        ModelingUtils.exportHypervolumeCSV(mojs.getHypervolumeHistory(), "hv_mojs.csv");
 
         MOACOOptimizer aco = new MOACOOptimizer(tasks, nodes, net, 40, 60, 50, 0.1, 1.0);
         List<SchedulingSolution> paretoACO = aco.run();
+        ModelingUtils.exportHypervolumeCSV(aco.getHypervolumeHistory(), "hv_aco.csv");
 
         // =========================================================
         // 5. BASELINES
