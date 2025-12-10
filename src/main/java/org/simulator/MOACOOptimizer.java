@@ -112,7 +112,7 @@ public class MOACOOptimizer {
         }
     }
 
-    public List<SchedulingSolution> run() {
+    public List<SchedulingSolution> run(double[] refPoint) {
 
         List<SchedulingSolution> archive = new ArrayList<>();
 
@@ -129,7 +129,6 @@ public class MOACOOptimizer {
             archive = ParetoUtils.updateArchive(archive, ants, archiveMaxSize);
 
             // === TRACK HYPERVOLUME ===
-            double[] refPoint = {100.0, 1.0, 5000.0};
             double hv = ParetoMetrics.hypervolume(archive, refPoint);
             hypervolumeHistory.add(hv);
 

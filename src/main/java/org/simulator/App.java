@@ -20,48 +20,23 @@ public class App {
         List<Node> nodes = List.of(edge, fog, cloud);
 
         // =========================================================
-        // 2. WORKFLOW TASKS
+        // 2. WORKFLOW CHOICE (DAM SHM / CYBERSHAKE100)
         // =========================================================
-        Task acqVib = new Task("acq_vibration", 9000, 12);
-        Task acqAco = new Task("acq_acoustic", 11000, 15);
-        Task acqPres = new Task("acq_pressure", 7000, 8);
 
-        Task filtVib = new Task("filter_vibration", 6000, 6);
-        Task filtAco = new Task("filter_acoustic", 7000, 7);
-        Task filtPres = new Task("filter_pressure", 5000, 5);
+        // true  -> CyberShake100
+        // false -> Workflow barrage initial
+        boolean useRealDax = true;
 
-        Task fftVib = new Task("fft_vibration", 14000, 4);
-        Task fftAco = new Task("fft_acoustic", 16000, 4);
-        Task featPres = new Task("feat_pressure", 8000, 3);
+        List<Task> tasks;
 
-        Task fusion = new Task("fusion", 10000, 5);
-        Task detection = new Task("detection", 25000, 2);
-        Task decision = new Task("decision", 4000, 0);
+        if (useRealDax) {
+            tasks = Workflows.loadCyberShakeFromDax("cybershake100.dax");
+            System.out.println("Loaded workflow: CyberShake100 (REAL DAX)");
+            System.out.println("Task count = " + tasks.size());
+        } else {
+            tasks = Workflows.createCyberShake100();  // version approximative
+        }
 
-        // DAG
-        filtVib.addPredecessor(acqVib);
-        filtAco.addPredecessor(acqAco);
-        filtPres.addPredecessor(acqPres);
-
-        fftVib.addPredecessor(filtVib);
-        fftAco.addPredecessor(filtAco);
-        featPres.addPredecessor(filtPres);
-
-        fusion.addPredecessor(fftVib);
-        fusion.addPredecessor(fftAco);
-        fusion.addPredecessor(featPres);
-
-        detection.addPredecessor(fusion);
-        decision.addPredecessor(detection);
-
-        List<Task> tasks = List.of(
-                acqVib, acqAco, acqPres,
-                filtVib, filtAco, filtPres,
-                fftVib, fftAco, featPres,
-                fusion, detection, decision
-        );
-
-        tasks = Utils.topoSort(tasks);
 
         // =========================================================
         // 3. NETWORK MODEL
@@ -82,12 +57,14 @@ public class App {
         // 4. METAHEURISTICS — MOJS + MO-ACO
         // =========================================================
 
+        double[] refPoint = {10000000.0, 500.0, 200000.0};
+
         MOJellyfishOptimizer mojs = new MOJellyfishOptimizer(tasks, nodes, net, 40, 60, 50);
-        List<SchedulingSolution> paretoJS = mojs.run();
+        List<SchedulingSolution> paretoJS = mojs.run(refPoint);
         ModelingUtils.exportHypervolumeCSV(mojs.getHypervolumeHistory(), "hv_mojs.csv");
 
         MOACOOptimizer aco = new MOACOOptimizer(tasks, nodes, net, 40, 60, 50, 0.1, 1.0);
-        List<SchedulingSolution> paretoACO = aco.run();
+        List<SchedulingSolution> paretoACO = aco.run(refPoint);
         ModelingUtils.exportHypervolumeCSV(aco.getHypervolumeHistory(), "hv_aco.csv");
 
         // =========================================================
@@ -115,8 +92,6 @@ public class App {
         // =========================================================
         // 7. PERFORMANCE METRICS
         // =========================================================
-
-        double[] refPoint = {100.0, 1.0, 5000.0};
 
         ModelingUtils.printMetrics(paretoJS, paretoACO, paretoRandom, paretoGreedy, refPoint);
 

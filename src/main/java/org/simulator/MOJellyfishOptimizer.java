@@ -64,7 +64,7 @@ public class MOJellyfishOptimizer {
     // Algorithme Jellyfish
     // ----------------------------------------------------------------------
 
-    public List<SchedulingSolution> run() {
+    public List<SchedulingSolution> run(double[] refPoint) {
 
         // Population initiale
         List<SchedulingSolution> population = new ArrayList<>();
@@ -80,7 +80,6 @@ public class MOJellyfishOptimizer {
 
         double prevHv = 0.0;
         int stagnationCounter = 0;
-        double[] refPoint = {100.0, 1.0, 5000.0};
 
         for (int iter = 1; iter <= maxIter; iter++) {
 
