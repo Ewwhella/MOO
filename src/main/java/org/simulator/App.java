@@ -104,30 +104,19 @@ public class App {
         // =========================================================
         // 6. DISPLAY PARETO FRONTS
         // =========================================================
-        printPareto("MOJS", paretoJS);
-        printPareto("MO-ACO", paretoACO);
-        printPareto("RANDOM", paretoRandom);
-        printPareto("GREEDY", paretoGreedy);
+
+        ModelingUtils.printPareto("MOJS", paretoJS);
+        ModelingUtils.printPareto("MO-ACO", paretoACO);
+        ModelingUtils.printPareto("RANDOM", paretoRandom);
+        ModelingUtils.printPareto("GREEDY", paretoGreedy);
 
         // =========================================================
         // 7. PERFORMANCE METRICS
         // =========================================================
 
-        System.out.println("\n=== PERFORMANCE METRICS ===");
-
         double[] refPoint = {100.0, 1.0, 5000.0};
 
-        System.out.println("\nHypervolume:");
-        System.out.println("MOJS :   " + ParetoMetrics.hypervolume(paretoJS, refPoint));
-        System.out.println("ACO  :   " + ParetoMetrics.hypervolume(paretoACO, refPoint));
-        System.out.println("RAND :   " + ParetoMetrics.hypervolume(paretoRandom, refPoint));
-        System.out.println("GREEDY : " + ParetoMetrics.hypervolume(paretoGreedy, refPoint));
-
-        System.out.println("\nSpacing:");
-        System.out.println("MOJS :   " + ParetoMetrics.spacing(paretoJS));
-        System.out.println("ACO  :   " + ParetoMetrics.spacing(paretoACO));
-        System.out.println("RAND :   " + ParetoMetrics.spacing(paretoRandom));
-        System.out.println("GREEDY : " + ParetoMetrics.spacing(paretoGreedy));
+        ModelingUtils.printMetrics(paretoJS, paretoACO, paretoRandom, paretoGreedy, refPoint);
 
         // CSV
         ParetoMetrics.exportCSV(paretoJS, "pareto_mojs.csv");
@@ -136,18 +125,10 @@ public class App {
         ParetoMetrics.exportCSV(paretoGreedy, "pareto_greedy.csv");
 
         System.out.println("\nCSV exported for all fronts.");
-    }
 
-    // UTIL
-    private static void printPareto(String name, List<SchedulingSolution> pareto) {
-        System.out.println("\n=== PARETO SOLUTIONS (" + name + ") ===");
-        System.out.printf("%-4s %-12s %-15s %-12s%n", "#", "Makespan", "Cost", "Energy");
-        System.out.println("---------------------------------------------------------");
-
-        int idx = 1;
-        for (SchedulingSolution s : pareto) {
-            System.out.printf("%-4d %-12.3f %-15.6f %-12.3f%n",
-                    idx++, s.getF1(), s.getF2(), s.getF3());
-        }
+        // =========================================================
+        // 9. MODELING
+        // =========================================================
+        ModelingUtils.runPythonPlot();
     }
 }
