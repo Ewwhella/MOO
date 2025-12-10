@@ -1,9 +1,9 @@
 package org.simulator.core;
 
-import org.simulator.io.DaxParser;
+import org.simulator.io.PegasusWorkflowParser;
 import org.simulator.util.Utils;
 
-import java.net.URL;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -88,19 +88,27 @@ public final class Workflows {
                 throw new IllegalArgumentException("Unsupported CyberShake size: " + size
                         + " (expected 30, 50 or 100)");
         }
-        return loadCyberShakeFromDax(filename);
+        return loadCyberShakeFromXML(filename);
     }
 
     /**
-     * Wrapper explicite si tu veux charger un autre fichier DAX/PEGASUS.
+     * Wrapper explicite
      */
-    public static List<Task> loadCyberShakeFromDax(String resourceName) {
-        URL url = Workflows.class.getClassLoader().getResource(resourceName);
-        if (url == null) {
-            throw new IllegalArgumentException(
-                    "Resource not found on classpath: " + resourceName);
+    public static List<Task> loadCyberShakeFromXML(String resourceName) {
+        try {
+            // Charge la ressource depuis le classpath
+            InputStream is = Workflows.class.getClassLoader().getResourceAsStream(resourceName);
+
+            if (is == null) {
+                throw new IllegalArgumentException("Resource not found on classpath: " + resourceName);
+            }
+
+            // Parse directement via InputStream (évite les bugs de chemins Windows)
+            return PegasusWorkflowParser.loadFromStream(is);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error loading XML resource: " + resourceName, e);
         }
-        String path = url.getPath();
-        return DaxParser.loadFromDax(path);
     }
+
 }
