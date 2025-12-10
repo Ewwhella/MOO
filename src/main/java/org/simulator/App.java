@@ -26,7 +26,7 @@ public class App {
     private static final boolean USE_CYBERSHAKE = true;
 
     // Taille du workflow CyberShake (30, 50 ou 100)
-    private static final int CYBERSHAKE_SIZE = 30;
+    private static final int CYBERSHAKE_SIZE = 50;
 
     public static void main(String[] args) {
 
@@ -137,14 +137,11 @@ public class App {
         // 4. REF POINT
         // =========================================================
 
-        double[] refPoint;
-        if (USE_CYBERSHAKE) {
-            // CyberShake : gros workflow => grosses valeurs
-            refPoint = new double[]{1.0e8, 2000.0, 1.0e6};
-        } else {
-            // Dam SHM : plus petit
-            refPoint = new double[]{1000.0, 10.0, 10000.0};
-        }
+        double[] refPoint = ParetoMetrics.computeAutoRefPoint(tasks, nodes, net);
+        System.out.println("Auto-refPoint = ["
+                + refPoint[0] + ", "
+                + refPoint[1] + ", "
+                + refPoint[2] + "]");
 
         // =========================================================
         // 5. METAHEURISTICS — MOJS + MO-ACO
