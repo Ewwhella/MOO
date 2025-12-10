@@ -92,6 +92,26 @@ def main():
     plt.tight_layout()
     plt.savefig("pareto_3d.png", dpi=300)
 
+    # ---------- Hypervolume Evolution ----------
+    try:
+        hv_js = pd.read_csv("hv_mojs.csv")
+        hv_aco = pd.read_csv("hv_aco.csv")
+
+        plt.figure()
+        plt.plot(hv_js["generation"], hv_js["hypervolume"], label="MOJS", color="tab:blue")
+        plt.plot(hv_aco["generation"], hv_aco["hypervolume"], label="MO-ACO", color="tab:orange")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Hypervolume")
+        plt.title("Hypervolume Evolution Over Generations")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig("hypervolume_evolution.png", dpi=300)
+
+    except FileNotFoundError:
+        print("Hypervolume CSV files not found. Skipping hypervolume plot.")
+
 
 if __name__ == "__main__":
     main()
