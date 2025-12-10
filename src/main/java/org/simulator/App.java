@@ -211,6 +211,7 @@ public class App {
         // =========================================================
         // 9. MODELING
         // =========================================================
-        ModelingUtils.runPythonPlot();
+        String workflowName = "CyberShake" + tasks.size();
+        ModelingUtils.runPythonPlot(workflowName);
     }
 }
