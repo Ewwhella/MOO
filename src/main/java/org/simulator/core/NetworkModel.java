@@ -1,4 +1,4 @@
-package org.simulator;
+package org.simulator.core;
 
 import java.util.HashMap;
 import java.util.Map;

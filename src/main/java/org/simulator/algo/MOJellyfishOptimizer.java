@@ -1,6 +1,16 @@
-package org.simulator;
+package org.simulator.algo;
+
+import org.simulator.core.NetworkModel;
+import org.simulator.core.Node;
+import org.simulator.core.SchedulingSolution;
+import org.simulator.core.Task;
+import org.simulator.eval.ParetoMetrics;
+import org.simulator.eval.ParetoUtils;
+import org.simulator.sim.Simulator;
+import org.simulator.util.Utils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -12,9 +22,14 @@ public class MOJellyfishOptimizer {
     private final int maxIter;
     private final int archiveMaxSize;
 
-    private final double mutationRate = 0.10;   // probabilité de mutation par gène
-    private final double restartRatio = 0.20;   // fraction de la population réinitialisée en cas de stagnation
-    private final int stagnationLimit = 8;      // nb d’itérations sans gain d’hypervolume avant restart
+    // ++ exploration / exploitation
+    private final double mutationRate       = 0.20;  // mutation plus forte
+    private final double restartRatio       = 0.25;  // pour les restarts
+    private final int    stagnationLimit    = 6;     // plus réactif
+
+    // Local search élitiste
+    private final double eliteRatio             = 0.15; // fraction de la pop améliorée
+    private final double localSearchTasksRatio  = 0.10; // % de tâches modifiées
 
     private final Random rand = new Random();
 
@@ -22,7 +37,7 @@ public class MOJellyfishOptimizer {
     private final List<Node> nodes;
     private final NetworkModel network;
 
-    // historique d’hypervolume pour le tracé
+    // historique d’hypervolume pour le tracé (monotone)
     private final List<Double> hypervolumeHistory = new ArrayList<>();
     public List<Double> getHypervolumeHistory() { return hypervolumeHistory; }
 
@@ -61,10 +76,10 @@ public class MOJellyfishOptimizer {
     }
 
     // ----------------------------------------------------------------------
-    // Algorithme Jellyfish
+    // Algorithme Jellyfish boosté
     // ----------------------------------------------------------------------
 
-    public List<SchedulingSolution> run() {
+    public List<SchedulingSolution> run(double[] refPoint) {
 
         // Population initiale
         List<SchedulingSolution> population = new ArrayList<>();
@@ -78,16 +93,16 @@ public class MOJellyfishOptimizer {
         List<SchedulingSolution> archive =
                 ParetoUtils.updateArchive(new ArrayList<>(), population, archiveMaxSize);
 
-        double prevHv = 0.0;
+        double bestHvSoFar = 0.0;
         int stagnationCounter = 0;
-        double[] refPoint = {100.0, 1.0, 5000.0};
 
         for (int iter = 1; iter <= maxIter; iter++) {
 
             double t = (double) iter / maxIter;           // temps normalisé [0,1]
+
             double[] meanPos = computeMeanPosition(population);
             SchedulingSolution guide =
-                    selectBestScalar(archive.isEmpty() ? population : archive);
+                    selectLeader(archive, population);
             double[] guidePos = toDoubleArray(guide.getAssignment());
 
             List<SchedulingSolution> newPop = new ArrayList<>();
@@ -98,14 +113,15 @@ public class MOJellyfishOptimizer {
                 double[] newPos = new double[curPos.length];
 
                 // probabilité d’être en phase ACTIVE augmente avec t
-                boolean activePhase = rand.nextDouble() < t;
+                double activeProb = 0.3 + 0.7 * t; // plus explorateur au début
+                boolean activePhase = rand.nextDouble() < activeProb;
 
                 if (!activePhase) {
-                    // Phase passive : attraction vers le centre + petite perturbation Lévy
+                    // Phase passive : attraction vers le centre + bruit Lévy
                     for (int d = 0; d < newPos.length; d++) {
                         double r1 = rand.nextDouble();
                         double drift = r1 * (meanPos[d] - curPos[d]);
-                        double noise = 0.15 * levySmall();   // exploration douce
+                        double noise = 0.25 * levySmall();   // exploration plus forte
                         newPos[d] = curPos[d] + drift + noise;
                     }
                 } else {
@@ -113,21 +129,21 @@ public class MOJellyfishOptimizer {
                     boolean towardGuide = rand.nextDouble() < 0.6;
 
                     if (towardGuide) {
-                        // mouvement vers la meilleure solution actuelle
+                        // mouvement vers un leader (archive)
                         for (int d = 0; d < newPos.length; d++) {
                             double r2 = rand.nextDouble();
-                            double step = 0.5 * r2 * (guidePos[d] - curPos[d]);
+                            double step = (0.4 + 0.3 * t) * r2 * (guidePos[d] - curPos[d]);
                             newPos[d] = curPos[d] + step;
                         }
                     } else {
-                        // interaction avec une autre solution
+                        // interaction avec une autre solution de la population
                         SchedulingSolution other =
                                 population.get(rand.nextInt(populationSize));
                         double[] otherPos = toDoubleArray(other.getAssignment());
                         for (int d = 0; d < newPos.length; d++) {
                             double r3 = rand.nextDouble();
                             double diff = otherPos[d] - curPos[d];
-                            double oscillation = 0.25 * levySmall() * Math.signum(diff);
+                            double oscillation = 0.35 * levySmall() * Math.signum(diff);
                             newPos[d] = curPos[d] + r3 * diff + oscillation;
                         }
                     }
@@ -142,15 +158,21 @@ public class MOJellyfishOptimizer {
                 newPop.add(child);
             }
 
+            // Local search sur les élites de newPop
+            applyLocalSearch(newPop);
+
             population = newPop;
             archive = ParetoUtils.updateArchive(archive, population, archiveMaxSize);
 
-            // Hypervolume
+            // Hypervolume (monotone)
             double hv = ParetoMetrics.hypervolume(archive, refPoint);
-            hypervolumeHistory.add(hv);
+            if (hv > bestHvSoFar) {
+                bestHvSoFar = hv;
+            }
+            hypervolumeHistory.add(bestHvSoFar);
 
-            if (hv > prevHv + 1e-6) {
-                prevHv = hv;
+            // Détection stagnation réelle (sur HV brut)
+            if (hv > bestHvSoFar + 1e-6) {
                 stagnationCounter = 0;
             } else {
                 stagnationCounter++;
@@ -164,6 +186,50 @@ public class MOJellyfishOptimizer {
         }
 
         return archive;
+    }
+
+    // ----------------------------------------------------------------------
+    // Local search élitiste
+    // ----------------------------------------------------------------------
+
+    private void applyLocalSearch(List<SchedulingSolution> population) {
+        int eliteCount = Math.max(1, (int) Math.round(population.size() * eliteRatio));
+
+        // trier par score scalaire (plus petit = meilleur)
+        population.sort(Comparator.comparingDouble(this::scalarScore));
+
+        for (int i = 0; i < eliteCount; i++) {
+            SchedulingSolution improved = localSearch(population.get(i));
+            population.set(i, improved);
+        }
+    }
+
+    private SchedulingSolution localSearch(SchedulingSolution base) {
+        // copie de l’assignement
+        int[] bestAssign = base.getAssignment().clone();
+        SchedulingSolution best = new SchedulingSolution(bestAssign);
+        best.setObjectives(base.getF1(), base.getF2(), base.getF3());
+        double bestScore = scalarScore(best);
+
+        int moves = Math.max(1, (int) Math.round(tasks.size() * localSearchTasksRatio));
+
+        for (int m = 0; m < moves; m++) {
+            int[] candidateAssign = bestAssign.clone();
+            int taskIndex = rand.nextInt(candidateAssign.length);
+            int newNode = rand.nextInt(nodes.size());
+            candidateAssign[taskIndex] = newNode;
+
+            SchedulingSolution cand = new SchedulingSolution(candidateAssign);
+            evaluate(cand);
+            double sc = scalarScore(cand);
+
+            if (sc < bestScore) {
+                best = cand;
+                bestAssign = candidateAssign;
+                bestScore = sc;
+            }
+        }
+        return best;
     }
 
     // ----------------------------------------------------------------------
@@ -222,26 +288,33 @@ public class MOJellyfishOptimizer {
         return mean;
     }
 
-    private SchedulingSolution selectBestScalar(List<SchedulingSolution> sols) {
-        SchedulingSolution best = sols.get(0);
+    // sélection d’un leader (tournoi dans l’archive)
+    private SchedulingSolution selectLeader(List<SchedulingSolution> archive,
+                                            List<SchedulingSolution> population) {
+        List<SchedulingSolution> pool =
+                archive.isEmpty() ? population : archive;
+
+        SchedulingSolution best = pool.get(rand.nextInt(pool.size()));
         double bestScore = scalarScore(best);
 
-        for (int i = 1; i < sols.size(); i++) {
-            double sc = scalarScore(sols.get(i));
+        int tournamentSize = Math.min(3, pool.size());
+        for (int k = 1; k < tournamentSize; k++) {
+            SchedulingSolution cand = pool.get(rand.nextInt(pool.size()));
+            double sc = scalarScore(cand);
             if (sc < bestScore) {
+                best = cand;
                 bestScore = sc;
-                best = sols.get(i);
             }
         }
         return best;
     }
 
-    // agrégation simple des 3 objectifs
+    // agrégation simple des 3 objectifs (à ajuster si besoin)
     private double scalarScore(SchedulingSolution s) {
         return s.getF1() + 1000.0 * s.getF2() + 0.01 * s.getF3();
     }
 
-    // pas Lévy "light"
+    // pas Lévy "boosté"
     private double levySmall() {
         double u = rand.nextGaussian();
         double v = rand.nextGaussian();
@@ -251,7 +324,7 @@ public class MOJellyfishOptimizer {
                         (gamma((1 + beta) / 2) * beta * Math.pow(2, (beta - 1) / 2)),
                 1.0 / beta
         );
-        double step = u * sigma / Math.pow(Math.abs(v), 1.0 / beta);
+        double step = u * sigma / Math.pow(Math.abs(v) + 1e-12, 1.0 / beta);
         return step;
     }
 

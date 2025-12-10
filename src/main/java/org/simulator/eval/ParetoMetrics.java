@@ -1,4 +1,10 @@
-package org.simulator;
+package org.simulator.eval;
+
+import org.simulator.algo.RandomSelection;
+import org.simulator.core.NetworkModel;
+import org.simulator.core.Node;
+import org.simulator.core.SchedulingSolution;
+import org.simulator.core.Task;
 
 import java.io.FileWriter;
 import java.util.ArrayList;
@@ -67,4 +73,24 @@ public class ParetoMetrics {
             e.printStackTrace();
         }
     }
+    public static double[] computeAutoRefPoint(List<Task> tasks, List<Node> nodes, NetworkModel net) {
+
+        RandomSelection rs = new RandomSelection(tasks, nodes, net, 30);  // 30 solutions suffisent
+        double maxF1 = 0, maxF2 = 0, maxF3 = 0;
+
+        for (SchedulingSolution s : rs.run()) {
+            maxF1 = Math.max(maxF1, s.getF1());
+            maxF2 = Math.max(maxF2, s.getF2());
+            maxF3 = Math.max(maxF3, s.getF3());
+        }
+
+        double m = 1.10;   // +10% de marge
+
+        return new double[]{
+                maxF1 * m,
+                maxF2 * m,
+                maxF3 * m
+        };
+    }
+
 }

@@ -1,67 +1,95 @@
 package org.simulator;
 
-import java.util.List;
+import org.simulator.algo.GreedyAlgorithm;
+import org.simulator.algo.MOACOOptimizer;
+import org.simulator.algo.MOJellyfishOptimizer;
+import org.simulator.algo.RandomSelection;
+import org.simulator.core.NetworkModel;
+import org.simulator.core.Node;
+import org.simulator.core.SchedulingSolution;
+import org.simulator.core.Task;
+import org.simulator.core.Workflows;
+import org.simulator.eval.ModelingUtils;
+import org.simulator.eval.ParetoMetrics;
 
+import java.util.ArrayList;
+import java.util.List;
 
 public class App {
 
+    // ============================================
+    // Choix du scénario
+    // ============================================
+
+    // false -> workflow barrage (Dam SHM)
+    // true  -> workflow CyberShake
+    private static final boolean USE_CYBERSHAKE = true;
+
+    // Taille du workflow CyberShake (30, 50 ou 100)
+    private static final int CYBERSHAKE_SIZE = 50;
+
     public static void main(String[] args) {
 
-        System.out.println("Workflow Simulator – Dam SHM Workflow (Edge–Fog–Cloud)");
+        System.out.println("Workflow Simulator – Multi-Objective Scheduling");
 
         // =========================================================
         // 1. NODES (EDGE, FOG, CLOUD)
         // =========================================================
 
-        Node edge = new Node("edge1", Node.Type.EDGE, 1500, 0.00045, 15);
-        Node fog = new Node("fog1", Node.Type.FOG, 6000, 0.00120, 90);
-        Node cloud = new Node("cloud1", Node.Type.CLOUD, 20000, 0.01000, 600);
+        List<Node> nodes = new ArrayList<>();
 
-        List<Node> nodes = List.of(edge, fog, cloud);
+        // Edge : 5 devices
+        for (int i = 1; i <= 5; i++) {
+            nodes.add(new Node(
+                    "edge" + i,
+                    Node.Type.EDGE,
+                    1000.0,    // MIPS
+                    0.0,       // cost per sec ($)
+                    0.700      // working power (W) = 700 mW
+            ));
+        }
 
-        // =========================================================
-        // 2. WORKFLOW TASKS
-        // =========================================================
-        Task acqVib = new Task("acq_vibration", 9000, 12);
-        Task acqAco = new Task("acq_acoustic", 11000, 15);
-        Task acqPres = new Task("acq_pressure", 7000, 8);
+        // Fog : 5 devices
+        for (int i = 1; i <= 5; i++) {
+            nodes.add(new Node(
+                    "fog" + i,
+                    Node.Type.FOG,
+                    1300.0,
+                    0.48,
+                    0.700      // 700 mW
+            ));
+        }
 
-        Task filtVib = new Task("filter_vibration", 6000, 6);
-        Task filtAco = new Task("filter_acoustic", 7000, 7);
-        Task filtPres = new Task("filter_pressure", 5000, 5);
+        // Cloud : 5 devices
+        for (int i = 1; i <= 5; i++) {
+            nodes.add(new Node(
+                    "cloud" + i,
+                    Node.Type.CLOUD,
+                    1600.0,
+                    0.96,
+                    1.648      // 1648 mW
+            ));
+        }
 
-        Task fftVib = new Task("fft_vibration", 14000, 4);
-        Task fftAco = new Task("fft_acoustic", 16000, 4);
-        Task featPres = new Task("feat_pressure", 8000, 3);
+        // ============================================
+        // 2. WORKFLOW : Dam SHM ou CyberShake-30/50/100
+        // ============================================
 
-        Task fusion = new Task("fusion", 10000, 5);
-        Task detection = new Task("detection", 25000, 2);
-        Task decision = new Task("decision", 4000, 0);
+        List<Task> tasks;
 
-        // DAG
-        filtVib.addPredecessor(acqVib);
-        filtAco.addPredecessor(acqAco);
-        filtPres.addPredecessor(acqPres);
+        if (!USE_CYBERSHAKE) {
+            // Ton workflow barrage initial
+            tasks = Workflows.createDamShmWorkflow();
+            System.out.println("Loaded workflow: Dam SHM (barrage)");
+            System.out.println("Task count = " + tasks.size());
+        } else {
+            // CyberShake depuis les vrais DAX / XML :
+            // CyberShake_30.xml, CyberShake_50.xml, CyberShake_100.xml
+            tasks = Workflows.loadCyberShake(CYBERSHAKE_SIZE);
+            System.out.println("Loaded workflow: CyberShake-" + CYBERSHAKE_SIZE);
+            System.out.println("Task count = " + tasks.size());
+        }
 
-        fftVib.addPredecessor(filtVib);
-        fftAco.addPredecessor(filtAco);
-        featPres.addPredecessor(filtPres);
-
-        fusion.addPredecessor(fftVib);
-        fusion.addPredecessor(fftAco);
-        fusion.addPredecessor(featPres);
-
-        detection.addPredecessor(fusion);
-        decision.addPredecessor(detection);
-
-        List<Task> tasks = List.of(
-                acqVib, acqAco, acqPres,
-                filtVib, filtAco, filtPres,
-                fftVib, fftAco, featPres,
-                fusion, detection, decision
-        );
-
-        tasks = Utils.topoSort(tasks);
 
         // =========================================================
         // 3. NETWORK MODEL
@@ -69,29 +97,78 @@ public class App {
 
         NetworkModel net = new NetworkModel();
 
-        net.setLink("edge1", "fog1", 0.01, 50);
-        net.setLink("fog1", "edge1", 0.01, 50);
+        // Edge <-> Fog
+        for (Node e : nodes) if (e.isEdge()) {
+            for (Node f : nodes) if (f.isFog()) {
+                net.setLink(e.getId(), f.getId(),
+                        0.01,      // latency (s)
+                        20480.0);  // bandwidth (MB/s) ~ 20480 Mbps
+                net.setLink(f.getId(), e.getId(),
+                        0.01,
+                        20480.0);
+            }
+        }
 
-        net.setLink("fog1", "cloud1", 0.05, 100);
-        net.setLink("cloud1", "fog1", 0.05, 100);
+        // Fog <-> Cloud
+        for (Node f : nodes) if (f.isFog()) {
+            for (Node c : nodes) if (c.isCloud()) {
+                net.setLink(f.getId(), c.getId(),
+                        0.05,      // latency (s)
+                        10000.0);  // bandwidth (MB/s)
+                net.setLink(c.getId(), f.getId(),
+                        0.05,
+                        10000.0);
+            }
+        }
 
-        net.setLink("edge1", "cloud1", 0.10, 20);
-        net.setLink("cloud1", "edge1", 0.10, 20);
+        // Edge <-> Cloud (lien plus faible)
+        for (Node e : nodes) if (e.isEdge()) {
+            for (Node c : nodes) if (c.isCloud()) {
+                net.setLink(e.getId(), c.getId(),
+                        0.10,
+                        100.0);    // MB/s
+                net.setLink(c.getId(), e.getId(),
+                        0.10,
+                        100.0);
+            }
+        }
 
         // =========================================================
-        // 4. METAHEURISTICS — MOJS + MO-ACO
+        // 4. REF POINT
         // =========================================================
 
-        MOJellyfishOptimizer mojs = new MOJellyfishOptimizer(tasks, nodes, net, 40, 60, 50);
-        List<SchedulingSolution> paretoJS = mojs.run();
+        double[] refPoint = ParetoMetrics.computeAutoRefPoint(tasks, nodes, net);
+        System.out.println("Auto-refPoint = ["
+                + refPoint[0] + ", "
+                + refPoint[1] + ", "
+                + refPoint[2] + "]");
+
+        // =========================================================
+        // 5. METAHEURISTICS — MOJS + MO-ACO
+        // =========================================================
+
+        MOJellyfishOptimizer mojs =
+                new MOJellyfishOptimizer(tasks, nodes, net,
+                        40,   // population size
+                        60,   // iterations
+                        50);  // archive size
+
+        List<SchedulingSolution> paretoJS = mojs.run(refPoint);
         ModelingUtils.exportHypervolumeCSV(mojs.getHypervolumeHistory(), "hv_mojs.csv");
 
-        MOACOOptimizer aco = new MOACOOptimizer(tasks, nodes, net, 40, 60, 50, 0.1, 1.0);
-        List<SchedulingSolution> paretoACO = aco.run();
+        MOACOOptimizer aco =
+                new MOACOOptimizer(tasks, nodes, net,
+                        40,   // ant count
+                        60,   // iterations
+                        50,   // archive size
+                        0.1,  // evaporation
+                        1.0); // initial pheromone
+
+        List<SchedulingSolution> paretoACO = aco.run(refPoint);
         ModelingUtils.exportHypervolumeCSV(aco.getHypervolumeHistory(), "hv_aco.csv");
 
         // =========================================================
-        // 5. BASELINES
+        // 6. BASELINES
         // =========================================================
 
         // BASELINE 1 : RANDOM SELECTION
@@ -116,9 +193,9 @@ public class App {
         // 7. PERFORMANCE METRICS
         // =========================================================
 
-        double[] refPoint = {100.0, 1.0, 5000.0};
-
-        ModelingUtils.printMetrics(paretoJS, paretoACO, paretoRandom, paretoGreedy, refPoint);
+        ModelingUtils.printMetrics(
+                paretoJS, paretoACO, paretoRandom, paretoGreedy, refPoint
+        );
 
         // CSV
         ParetoMetrics.exportCSV(paretoJS, "pareto_mojs.csv");
@@ -131,6 +208,7 @@ public class App {
         // =========================================================
         // 9. MODELING
         // =========================================================
-        ModelingUtils.runPythonPlot();
+        String workflowName = "CyberShake" + tasks.size();
+        ModelingUtils.runPythonPlot(workflowName);
     }
 }

@@ -1,4 +1,6 @@
-package org.simulator;
+package org.simulator.eval;
+
+import org.simulator.core.SchedulingSolution;
 
 import java.io.BufferedReader;
 import java.io.FileWriter;
@@ -55,13 +57,14 @@ public class ModelingUtils {
 
 
     // Call the Python plotting script
-    public static void runPythonPlot() {
+    public static void runPythonPlot(String workflowName) {
         try {
             String pythonExe = "py";  // replace with python3 if needed
 
             ProcessBuilder pb = new ProcessBuilder(
                     pythonExe,
-                    "plot_pareto.py"
+                    "plot_pareto.py",
+                    workflowName
             );
 
             pb.redirectErrorStream(true);

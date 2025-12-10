@@ -1,4 +1,4 @@
-package org.simulator;
+package org.simulator.core;
 
 public class SchedulingSolution {
 
