@@ -1,4 +1,8 @@
-package org.simulator;
+package org.simulator.sim;
+
+import org.simulator.core.NetworkModel;
+import org.simulator.core.Node;
+import org.simulator.core.Task;
 
 import java.util.HashMap;
 import java.util.List;
