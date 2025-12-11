@@ -66,6 +66,7 @@ public class MOACOOptimizer {
         }
     }
 
+    // choix probabiliste basé sur les phéromones
     private SchedulingSolution constructSolution() {
         int[] assign = new int[tasks.size()];
 
@@ -92,12 +93,14 @@ public class MOACOOptimizer {
         return new SchedulingSolution(assign);
     }
 
+    // simulation classique du workflow
     private void evaluate(SchedulingSolution sol) {
         Map<String, String> assignment = Utils.convert(sol.getAssignment(), tasks, nodes);
         Simulator.SimulationResult r = Simulator.simulate(tasks, nodes, assignment, network);
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
     }
 
+    // évaporation standard
     private void evaporate() {
         for (int i = 0; i < tasks.size(); i++) {
             for (int k = 0; k < nodes.size(); k++) {
@@ -107,6 +110,7 @@ public class MOACOOptimizer {
         }
     }
 
+    // renforcement des choix utilisés par les solutions du front
     private void deposit(List<SchedulingSolution> archive) {
         if (archive.isEmpty()) return;
 
@@ -125,8 +129,10 @@ public class MOACOOptimizer {
 
         List<SchedulingSolution> archive = new ArrayList<>();
 
+        //boucle principale
         for (int iter = 1; iter <= maxIter; iter++) {
 
+            // fourmis -> solutions -> archive
             List<SchedulingSolution> ants = new ArrayList<>();
 
             for (int a = 0; a < antCount; a++) {
@@ -137,7 +143,7 @@ public class MOACOOptimizer {
 
             archive = ParetoUtils.updateArchive(archive, ants, archiveMaxSize);
 
-            // === TRACK HYPERVOLUME ===
+            // suivi HV
             double hv = ParetoMetrics.hypervolume(archive, refPoint);
             hypervolumeHistory.add(hv);
 

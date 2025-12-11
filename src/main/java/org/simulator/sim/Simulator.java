@@ -10,16 +10,8 @@ import java.util.Map;
 
 public class Simulator {
 
-    /**
-     * Simule l'exécution d'un workflow pour une affectation donnée tâche -> nœud.
-     *
-     * @param tasks       liste de tâches du workflow (on suppose ici qu'elles sont déjà en ordre topologique :
-     *                    les prédécesseurs apparaissent avant les successeurs dans la liste).
-     * @param nodes       liste des nœuds Fog / Cloud.
-     * @param assignment  affectation tâche -> nodeId (x_ik implicite).
-     * @param networkModel modèle réseau pour les latences et bandes passantes.
-     * @return les métriques agrégées : makespan, coût total, énergie totale.
-     */
+    // Simule l'exécution d'un workflow pour une affectation donnée tâche -> nœud.
+
     public static SimulationResult simulate(
             List<Task> tasks,
             List<Node> nodes,
@@ -28,7 +20,7 @@ public class Simulator {
     ) {
         // indexation rapide : nodeId -> Node
         Map<String, Node> nodeById = new HashMap<>();
-        // instant où chaque nœud devient disponible (fin de la dernière tâche exécutée sur ce nœud)
+        // instant où chaque noeud devient disponible (fin de la dernière tâche exécutée sur ce noeud)
         Map<String, Double> nodeAvailableAt = new HashMap<>();
         for (Node node : nodes) {
             nodeAvailableAt.put(node.getId(), 0.0);
@@ -60,7 +52,7 @@ public class Simulator {
                 throw new IllegalArgumentException("Node inexistant pour l'id " + nodeId);
             }
 
-            // Temps de calcul sur ce nœud : work (MI) / MIPS => secondes
+            // Temps de calcul sur ce noeud : work (MI) / MIPS => secondes
             double execTimeSeconds = task.getWorkMI() / node.getMips();
 
             // Calcul du plus tôt début possible (si)
@@ -96,10 +88,10 @@ public class Simulator {
                 }
             }
 
-            // contrainte de ressource : la tâche ne peut démarrer que lorsque le nœud est libre
+            // contrainte de ressource : la tâche ne peut démarrer que lorsque le noeud est libre
             double resourceReady = nodeAvailableAt.get(nodeId);
 
-            // startTime = max(constraint DAG + communications, disponibilité du nœud)
+            // startTime = max(constraint DAG + communications, disponibilité du noeud)
             double startTime = Math.max(earliestStart, resourceReady);
 
             double finishTime = startTime + execTimeSeconds;

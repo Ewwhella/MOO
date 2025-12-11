@@ -10,9 +10,6 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.*;
 
-/**
- * Parser Pegasus (.dax/.xml) pour workflows cyberShake, Montage, LIGO, etc.
- */
 public final class PegasusWorkflowParser {
 
     private static final double DEFAULT_RUNTIME_TO_MI = 10000.0;
@@ -24,9 +21,7 @@ public final class PegasusWorkflowParser {
         return Double.parseDouble(s.replace(',', '.'));
     }
 
-    // =====================================================================
     // 1) Fichier classique
-    // =====================================================================
     public static List<Task> loadFromPegasusWorkflow(String path) {
         return loadFromPegasusWorkflow(path, DEFAULT_RUNTIME_TO_MI);
     }
@@ -44,9 +39,8 @@ public final class PegasusWorkflowParser {
         }
     }
 
-    // =====================================================================
     // 2) Chargement depuis InputStream (classpath, jar, IDE)
-    // =====================================================================
+
     public static List<Task> loadFromStream(InputStream is) {
         return loadFromStream(is, DEFAULT_RUNTIME_TO_MI);
     }
@@ -64,16 +58,14 @@ public final class PegasusWorkflowParser {
         }
     }
 
-    // =====================================================================
+
     // 3) Parser DOM commun pour fichier + stream
-    // =====================================================================
+
     private static List<Task> parseDocument(Document doc, double runtimeToMiFactor) {
 
         Map<String, Task> taskMap = new HashMap<>();
 
-        // ------------------------------------------------------------
-        // Jobs → tâches
-        // ------------------------------------------------------------
+        // Jobs -> tâches
         NodeList jobNodes = doc.getElementsByTagName("job");
 
         for (int i = 0; i < jobNodes.getLength(); i++) {
@@ -98,9 +90,7 @@ public final class PegasusWorkflowParser {
             taskMap.put(id, t);
         }
 
-        // ------------------------------------------------------------
-        // Dépendances parent → child
-        // ------------------------------------------------------------
+        // Dépendances parent -> child
         NodeList childNodes = doc.getElementsByTagName("child");
 
         for (int i = 0; i < childNodes.getLength(); i++) {

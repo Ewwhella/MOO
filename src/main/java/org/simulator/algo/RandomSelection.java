@@ -29,6 +29,7 @@ public class RandomSelection {
 
     public List<SchedulingSolution> run() {
 
+        // génère une affectation totalement aléatoire
         List<SchedulingSolution> sols = new ArrayList<>();
         Random rd = new Random();
 
@@ -50,6 +51,7 @@ public class RandomSelection {
             sols.add(sol);
         }
 
+        // on ne garde que les non-dominées
         return ParetoUtils.updateArchive(new ArrayList<>(), sols, 50);
     }
 }

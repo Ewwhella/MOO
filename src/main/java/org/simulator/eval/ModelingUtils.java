@@ -9,7 +9,7 @@ import java.util.List;
 
 public class ModelingUtils {
 
-    // print one Pareto front
+    // affichage lisible du front
     public static void printPareto(String name, List<SchedulingSolution> pareto) {
         System.out.println("\n=== PARETO SOLUTIONS (" + name + ") ===");
         System.out.printf("%-4s %-12s %-15s %-12s%n", "#", "Makespan", "Cost", "Energy");
@@ -22,7 +22,7 @@ public class ModelingUtils {
         }
     }
 
-    // Print hypervolume and spacing for all methods
+    // Affichage de l'hypervolume et du pourcentage pour toutes les méthodes
     public static void printMetrics(List<SchedulingSolution> js,
                                     List<SchedulingSolution> aco,
                                     List<SchedulingSolution> random,
@@ -56,10 +56,10 @@ public class ModelingUtils {
     }
 
 
-    // Call the Python plotting script
+    // Appel de l'affichage Python
     public static void runPythonPlot(String workflowName) {
         try {
-            String pythonExe = "py";  // replace with python3 if needed
+            String pythonExe = "py";  // potentiellement remplacer par "python" ou "python3"
 
             ProcessBuilder pb = new ProcessBuilder(
                     pythonExe,

@@ -55,9 +55,7 @@ public class MOJellyfishOptimizer {
         this.archiveMaxSize = archiveMaxSize;
     }
 
-    // ----------------------------------------------------------------------
     // Construction / évaluation d’une solution
-    // ----------------------------------------------------------------------
 
     private SchedulingSolution randomSolution() {
         int[] assign = new int[tasks.size()];
@@ -75,9 +73,7 @@ public class MOJellyfishOptimizer {
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
     }
 
-    // ----------------------------------------------------------------------
-    // Algorithme Jellyfish boosté
-    // ----------------------------------------------------------------------
+    // Algorithme Jellyfish amélioré
 
     public List<SchedulingSolution> run(double[] refPoint) {
 
@@ -188,9 +184,7 @@ public class MOJellyfishOptimizer {
         return archive;
     }
 
-    // ----------------------------------------------------------------------
     // Local search élitiste
-    // ----------------------------------------------------------------------
 
     private void applyLocalSearch(List<SchedulingSolution> population) {
         int eliteCount = Math.max(1, (int) Math.round(population.size() * eliteRatio));
@@ -232,9 +226,7 @@ public class MOJellyfishOptimizer {
         return best;
     }
 
-    // ----------------------------------------------------------------------
     // Outils numériques
-    // ----------------------------------------------------------------------
 
     private double[] toDoubleArray(int[] a) {
         double[] x = new double[a.length];

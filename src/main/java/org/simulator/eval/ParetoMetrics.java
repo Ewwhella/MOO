@@ -12,10 +12,9 @@ import java.util.List;
 
 public class ParetoMetrics {
 
-    /**
-     * Hypervolume indicator (3D) : volume dominé jusqu'au point de référence.
-     * On suppose minimisation de f1, f2, f3.
-     */
+
+    // Hypervolume : volume dominé jusqu'au point de référence
+
     public static double hypervolume(List<SchedulingSolution> sols, double[] ref) {
         double hv = 0.0;
 
@@ -29,10 +28,9 @@ public class ParetoMetrics {
         return hv;
     }
 
-    /**
-     * Spacing metric :
-     * Mesure la régularité de l'espacement des points du front Pareto.
-     */
+
+     // Spacing :  Mesure la régularité de l'espacement des points du front de Pareto
+
     public static double spacing(List<SchedulingSolution> sols) {
         List<Double> distances = new ArrayList<>();
 
@@ -60,9 +58,9 @@ public class ParetoMetrics {
         return Math.sqrt(sum / distances.size());
     }
 
-    /**
-     * Export CSV pour tracer les fronts Pareto (Python/Excel).
-     */
+
+     // Export CSV pour tracer les fronts de Pareto en Python
+
     public static void exportCSV(List<SchedulingSolution> sols, String file) {
         try (FileWriter fw = new FileWriter(file)) {
             fw.write("f1_makespan,f2_cost,f3_energy\n");
@@ -73,9 +71,11 @@ public class ParetoMetrics {
             e.printStackTrace();
         }
     }
+
+    // Calcul automatique du refPoint pour l'adapter à nos différents cas (Cybershake30, 50, etc...)
     public static double[] computeAutoRefPoint(List<Task> tasks, List<Node> nodes, NetworkModel net) {
 
-        RandomSelection rs = new RandomSelection(tasks, nodes, net, 30);  // 30 solutions suffisent
+        RandomSelection rs = new RandomSelection(tasks, nodes, net, 30);  // 30 solutions devraient suffire
         double maxF1 = 0, maxF2 = 0, maxF3 = 0;
 
         for (SchedulingSolution s : rs.run()) {

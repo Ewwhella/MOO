@@ -40,6 +40,7 @@ public class GreedyAlgorithm {
                 double cost = exec * node.getCostPerSec();
                 double energy = exec * node.getPowerPerSec();
 
+                // critère naïf mais cohérent
                 double score = exec + cost + energy;
 
                 if (score < bestScore) {

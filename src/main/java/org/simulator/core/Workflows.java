@@ -7,18 +7,12 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Présets de workflows :
- *  - Dam SHM
- *  - CyberShake 30 / 50 / 100
- */
 public final class Workflows {
 
     private Workflows() { }
 
-    // =========================================================
     // 1) Workflow barrage – Dam SHM
-    // =========================================================
+
     public static List<Task> createDamShmWorkflow() {
 
         Task acqVib   = new Task("acq_vibration", 9000, 12);
@@ -62,16 +56,8 @@ public final class Workflows {
         return Utils.topoSort(tasks);
     }
 
-    // ============================
     // 2) Workflow CyberShake
-    // ============================
-    /**
-     * Charge un workflow CyberShake à partir de la taille (30, 50, 100).
-     * Les fichiers doivent être présents dans le répertoire d'exécution :
-     *  - CyberShake_30.xml
-     *  - CyberShake_50.xml
-     *  - CyberShake_100.xml
-     */
+
     public static List<Task> loadCyberShake(int size) {
         String filename;
         switch (size) {
@@ -91,9 +77,7 @@ public final class Workflows {
         return loadCyberShakeFromXML(filename);
     }
 
-    /**
-     * Wrapper explicite
-     */
+
     public static List<Task> loadCyberShakeFromXML(String resourceName) {
         try {
             // Charge la ressource depuis le classpath
@@ -103,7 +87,7 @@ public final class Workflows {
                 throw new IllegalArgumentException("Resource not found on classpath: " + resourceName);
             }
 
-            // Parse directement via InputStream (évite les bugs de chemins Windows)
+            // Parse directement via InputStream (pour éviter les bugs de chemin Windows de Pierre...)
             return PegasusWorkflowParser.loadFromStream(is);
 
         } catch (Exception e) {
