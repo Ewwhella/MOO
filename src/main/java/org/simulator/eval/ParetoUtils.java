@@ -11,7 +11,7 @@ public class ParetoUtils {
     public static boolean dominates(SchedulingSolution a, SchedulingSolution b) {
         boolean strictlyBetter = false;
 
-        // si a est pire sur au moins un objectif → pas de domination
+        // si a est pire sur au moins un objectif -> pas de domination
         if (a.getF1() > b.getF1() || a.getF2() > b.getF2() || a.getF3() > b.getF3()) {
             return false;
         }
@@ -52,7 +52,7 @@ public class ParetoUtils {
             if (!dominated) newArchive.add(s);
         }
 
-        // si trop de solutions → simple tronquage (archive fixe)
+        // si trop de solutions -> simple tronquage (archive fixe)
         if (newArchive.size() > maxSize) {
             newArchive = newArchive.subList(0, maxSize);
         }

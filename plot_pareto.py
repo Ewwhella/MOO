@@ -7,12 +7,12 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 def main():
 
-    # --- Determine folder where CSV are located ---
+    # Détermine le dossier où les fichiers sont stockées
     CSV_DIR = os.path.dirname(os.path.abspath(__file__))
     print(f"[INFO] Loading CSV from: {CSV_DIR}")
     print(f"[INFO] Saving PNG to the same folder.")
 
-    # Load CSVs
+    # Chargement des CSVs
     mojs   = pd.read_csv(os.path.join(CSV_DIR, "pareto_mojs.csv"))
     aco    = pd.read_csv(os.path.join(CSV_DIR, "pareto_aco.csv"))
     random = pd.read_csv(os.path.join(CSV_DIR, "pareto_random.csv"))
@@ -39,7 +39,7 @@ def main():
         "GREEDY": "D",
     }
 
-    # ---------- 2D : f1 vs f2 ----------
+    # 2D : f1 vs f2
     plt.figure()
     for name, df in algos.items():
         plt.scatter(df["f1_makespan"], df["f2_cost"],
@@ -52,7 +52,7 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(CSV_DIR, "pareto_f1_f2.png"), dpi=300)
 
-    # ---------- 2D : f1 vs f3 ----------
+    # 2D : f1 vs f3
     plt.figure()
     for name, df in algos.items():
         plt.scatter(df["f1_makespan"], df["f3_energy"],
@@ -65,7 +65,7 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(CSV_DIR, "pareto_f1_f3.png"), dpi=300)
 
-    # ---------- 3D : f1, f2, f3 ----------
+    # 3D : f1, f2, f3
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
@@ -81,7 +81,7 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(CSV_DIR, "pareto_3d.png"), dpi=300)
 
-    # ---------- Hypervolume Evolution ----------
+    # Hypervolume Evolution
     try:
         hv_js = pd.read_csv(os.path.join(CSV_DIR, "hv_mojs.csv"))
         hv_aco = pd.read_csv(os.path.join(CSV_DIR, "hv_aco.csv"))
