@@ -9,30 +9,50 @@ import org.simulator.util.Utils;
 
 import java.util.*;
 
+import static org.simulator.eval.ParetoUtils.updateArchive;
+
 /**
- * MOJS (Multi-Objective Jellyfish Search) from scratch:
- * - Representation: int[] assignment, assignment[i] = node index for task i
- * - Explicit objectives: (f1,f2,f3) via Simulator.simulate(...)
- * - Pareto archive: non-dominated set + truncation by crowding distance
- * - Optional hypervolume history: exact HV for 3 objectives (minimization) with a ref point
+ * MOJS (Multi-Objective Jellyfish Search) from scratch (discretisé) :
+ * - Représentation : int[] assignment, assignment[i] = index du noeud pour la tâche i
+ * - Calcul explicite des objectifs (f1, f2, f3) via Simulator.simulate(...)
+ * - Archivage Pareto : solutions non dominées + troncature par crowding distance (via ParetoUtils)
  *
- * No dependency on ParetoUtils / ParetoMetrics.
+ * Remarque importante :
+ * Le Jellyfish est continu, mais notre problème est discret (affectation tâche -> noeud).
+ * Donc on remplace le simple arrondi (round) par une discrétisation "operator-based" :
+ * - on modifie seulement un sous-ensemble de tâches
+ * - on applique soit un mouvement guidé (vers la position continue proposée),
+ *   soit un mouvement aléatoire (exploration)
  */
 public class MOJellyfishOptimizer {
 
-    // Core parameters
+    // Paramètres principaux
     private final int populationSize;
     private final int maxIter;
     private final int archiveMaxSize;
 
     // Exploration / exploitation
-    private final double mutationRate = 0.20;
+    private final double mutationRate = 0.20; // (conservé mais plus utilisé dans la boucle principale)
     private final double restartRatio = 0.25;
     private final int stagnationLimit = 6;
 
-    // Local search
+    // Recherche locale
     private final double eliteRatio = 0.15;
     private final double localSearchTasksRatio = 0.10;
+
+    // -----------------------------
+    // Paramètres de discrétisation (nouveau)
+    // -----------------------------
+    // Probabilité de suivre le "guide" (arrondi local) au début et à la fin
+    private final double guidedProbStart = 0.85;   // au début : plus guidé
+    private final double guidedProbEnd   = 0.55;   // à la fin : plus d'exploration
+
+    // Proportion de tâches modifiées par itération (décroît avec t)
+    private final double changeRatioMin  = 0.04;   // au minimum 4% des tâches
+    private final double changeRatioMax  = 0.20;   // au début jusqu'à 20% des tâches
+
+    // Petit bruit additionnel (évite les solutions identiques)
+    private final double extraMutation   = 0.03;
 
     private final Random rand;
 
@@ -40,6 +60,7 @@ public class MOJellyfishOptimizer {
     private final List<Node> nodes;
     private final NetworkModel network;
 
+    // Historique hypervolume (si refPoint fourni)
     private final List<Double> hypervolumeHistory = new ArrayList<>();
     public List<Double> getHypervolumeHistory() { return hypervolumeHistory; }
 
@@ -68,17 +89,13 @@ public class MOJellyfishOptimizer {
         this.rand = rand == null ? new Random() : rand;
     }
 
-    // -----------------------------
-    // Public API
-    // -----------------------------
-
     /**
-     * @param refPoint reference point for hypervolume in minimization space: [refF1, refF2, refF3]
-     *                 Set to null if you do not want HV history.
+     * @param refPoint point de référence pour l'hypervolume : [refF1, refF2, refF3]
+     *                 Mettre null si on ne veut pas calculer l'hypervolume.
      */
     public List<SchedulingSolution> run(double[] refPoint) {
 
-        // Init population
+        // 1) Initialisation population
         List<SchedulingSolution> population = new ArrayList<>(populationSize);
         for (int i = 0; i < populationSize; i++) {
             SchedulingSolution s = randomSolution();
@@ -86,15 +103,16 @@ public class MOJellyfishOptimizer {
             population.add(s);
         }
 
-        // Init archive
+        // 2) Initialisation archive Pareto
         List<SchedulingSolution> archive = updateArchive(Collections.emptyList(), population, archiveMaxSize);
 
         double bestHvSoFar = 0.0;
         int stagnationCounter = 0;
 
+        // 3) Boucle d'itérations
         for (int iter = 1; iter <= maxIter; iter++) {
 
-            double t = (double) iter / (double) maxIter; // normalized time [0,1]
+            double t = (double) iter / (double) maxIter; // temps normalisé [0,1]
 
             double[] meanPos = computeMeanPosition(population);
             SchedulingSolution leader = selectLeader(archive, population);
@@ -104,14 +122,17 @@ public class MOJellyfishOptimizer {
 
             for (int i = 0; i < populationSize; i++) {
                 SchedulingSolution current = population.get(i);
+
+                // Représentation "continue" temporaire (juste pour générer une direction)
                 double[] curPos = toDoubleArray(current.getAssignment());
                 double[] newPos = new double[curPos.length];
 
+                // Comportement Jellyfish : phase active ou passive
                 double activeProb = 0.3 + 0.7 * t;
                 boolean activePhase = rand.nextDouble() < activeProb;
 
                 if (!activePhase) {
-                    // Passive: drift to mean + Lévy noise
+                    // Phase passive : dérive vers la moyenne + bruit Lévy
                     for (int d = 0; d < newPos.length; d++) {
                         double r1 = rand.nextDouble();
                         double drift = r1 * (meanPos[d] - curPos[d]);
@@ -121,14 +142,14 @@ public class MOJellyfishOptimizer {
                 } else {
                     boolean towardLeader = rand.nextDouble() < 0.6;
                     if (towardLeader) {
-                        // Active: move toward leader
+                        // Phase active : mouvement vers le leader
                         for (int d = 0; d < newPos.length; d++) {
                             double r2 = rand.nextDouble();
                             double step = (0.4 + 0.3 * t) * r2 * (leaderPos[d] - curPos[d]);
                             newPos[d] = curPos[d] + step;
                         }
                     } else {
-                        // Active: interact with another jellyfish
+                        // Phase active : interaction avec une autre méduse
                         SchedulingSolution other = population.get(rand.nextInt(populationSize));
                         double[] otherPos = toDoubleArray(other.getAssignment());
                         for (int d = 0; d < newPos.length; d++) {
@@ -140,30 +161,36 @@ public class MOJellyfishOptimizer {
                     }
                 }
 
-                int[] discrete = discretize(newPos, nodes.size());
-                mutate(discrete);
+                // -----------------------------
+                // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
+                // -----------------------------
+                // Au lieu de faire round() sur tout le vecteur (souvent trop brutal),
+                // on modifie seulement k tâches :
+                // - soit on suit la direction suggérée par newPos (mouvement guidé)
+                // - soit on réassigne aléatoirement (exploration)
+                int[] nextAssign = applyDiscreteMove(current.getAssignment(), newPos, t);
 
-                SchedulingSolution child = new SchedulingSolution(discrete);
+                SchedulingSolution child = new SchedulingSolution(nextAssign);
                 evaluate(child);
                 newPop.add(child);
             }
 
-            // Local search on elites
+            // 4) Recherche locale sur les élites
             applyLocalSearch(newPop);
 
             population = newPop;
 
-            // Update archive
+            // 5) Mise à jour archive Pareto (centralisée dans ParetoUtils)
             List<SchedulingSolution> oldArchive = archive;
-            archive = updateArchive(oldArchive, population, archiveMaxSize);
+            archive = updateArchive(archive, population, archiveMaxSize);
 
-            // Hypervolume history (optional)
+            // 6) Hypervolume (optionnel) + redémarrage partiel si stagnation
             if (refPoint != null && refPoint.length == 3) {
                 double hv = hypervolume3DMin(archive, refPoint);
                 if (hv > bestHvSoFar) bestHvSoFar = hv;
                 hypervolumeHistory.add(bestHvSoFar);
 
-                // Stagnation detection on raw HV
+                // Détection stagnation (sur l'HV brut)
                 if (hv > bestHvSoFar + 1e-9) stagnationCounter = 0;
                 else stagnationCounter++;
 
@@ -172,10 +199,10 @@ public class MOJellyfishOptimizer {
                     stagnationCounter = 0;
                 }
             } else {
-                // still allow restart based on "no archive improvement" proxy
                 boolean changed = (archive.size() != oldArchive.size());
                 if (changed) stagnationCounter = 0;
                 else stagnationCounter++;
+
                 if (stagnationCounter >= stagnationLimit) {
                     partialRestart(population);
                     stagnationCounter = 0;
@@ -187,7 +214,7 @@ public class MOJellyfishOptimizer {
     }
 
     // -----------------------------
-    // Solution building + evaluation
+    // Construction solution + évaluation
     // -----------------------------
 
     private SchedulingSolution randomSolution() {
@@ -205,270 +232,7 @@ public class MOJellyfishOptimizer {
     }
 
     // -----------------------------
-    // Pareto: dominance + archive
-    // -----------------------------
-
-    private boolean dominates(SchedulingSolution a, SchedulingSolution b) {
-        // Minimization on f1,f2,f3
-        boolean strictlyBetter = false;
-
-        if (a.getF1() > b.getF1()) return false;
-        if (a.getF2() > b.getF2()) return false;
-        if (a.getF3() > b.getF3()) return false;
-
-        if (a.getF1() < b.getF1()) strictlyBetter = true;
-        if (a.getF2() < b.getF2()) strictlyBetter = true;
-        if (a.getF3() < b.getF3()) strictlyBetter = true;
-
-        return strictlyBetter;
-    }
-
-    private boolean sameAssignment(SchedulingSolution a, SchedulingSolution b) {
-        int[] x = a.getAssignment();
-        int[] y = b.getAssignment();
-        if (x.length != y.length) return false;
-        for (int i = 0; i < x.length; i++) if (x[i] != y[i]) return false;
-        return true;
-    }
-
-    private List<SchedulingSolution> updateArchive(List<SchedulingSolution> archive,
-                                                   List<SchedulingSolution> candidates,
-                                                   int maxSize) {
-        List<SchedulingSolution> merged = new ArrayList<>(
-                (archive == null ? 0 : archive.size()) + (candidates == null ? 0 : candidates.size())
-        );
-        if (archive != null) merged.addAll(archive);
-        if (candidates != null) merged.addAll(candidates);
-
-        // Remove exact duplicates (by assignment). Keeps first occurrence.
-        merged = removeDuplicateAssignments(merged);
-
-        // Keep only non-dominated
-        List<SchedulingSolution> nd = getNonDominated(merged);
-
-        if (nd.size() <= maxSize) return nd;
-
-        // Truncate by crowding distance (bigger is better)
-        Map<SchedulingSolution, Double> crowd = crowdingDistance(nd);
-        nd.sort((s1, s2) -> Double.compare(crowd.getOrDefault(s2, 0.0), crowd.getOrDefault(s1, 0.0)));
-        return new ArrayList<>(nd.subList(0, maxSize));
-    }
-
-    private List<SchedulingSolution> removeDuplicateAssignments(List<SchedulingSolution> sols) {
-        List<SchedulingSolution> out = new ArrayList<>();
-        for (SchedulingSolution s : sols) {
-            boolean exists = false;
-            for (SchedulingSolution t : out) {
-                if (sameAssignment(s, t)) { exists = true; break; }
-            }
-            if (!exists) out.add(s);
-        }
-        return out;
-    }
-
-    private List<SchedulingSolution> getNonDominated(List<SchedulingSolution> sols) {
-        List<SchedulingSolution> nd = new ArrayList<>();
-        for (int i = 0; i < sols.size(); i++) {
-            SchedulingSolution s = sols.get(i);
-            boolean dominated = false;
-            for (int j = 0; j < sols.size(); j++) {
-                if (i == j) continue;
-                if (dominates(sols.get(j), s)) { dominated = true; break; }
-            }
-            if (!dominated) nd.add(s);
-        }
-        return nd;
-    }
-
-    private Map<SchedulingSolution, Double> crowdingDistance(List<SchedulingSolution> front) {
-        Map<SchedulingSolution, Double> dist = new HashMap<>();
-        for (SchedulingSolution s : front) dist.put(s, 0.0);
-
-        if (front.size() <= 2) {
-            for (SchedulingSolution s : front) dist.put(s, Double.POSITIVE_INFINITY);
-            return dist;
-        }
-
-        crowdOnObjective(front, dist, 1);
-        crowdOnObjective(front, dist, 2);
-        crowdOnObjective(front, dist, 3);
-
-        return dist;
-    }
-
-    private void crowdOnObjective(List<SchedulingSolution> front,
-                                  Map<SchedulingSolution, Double> dist,
-                                  int objIdx) {
-        front.sort(Comparator.comparingDouble(s -> obj(s, objIdx)));
-
-        int n = front.size();
-        SchedulingSolution minS = front.get(0);
-        SchedulingSolution maxS = front.get(n - 1);
-
-        dist.put(minS, Double.POSITIVE_INFINITY);
-        dist.put(maxS, Double.POSITIVE_INFINITY);
-
-        double min = obj(minS, objIdx);
-        double max = obj(maxS, objIdx);
-        double range = max - min;
-        if (Math.abs(range) < 1e-12) return;
-
-        for (int i = 1; i < n - 1; i++) {
-            SchedulingSolution s = front.get(i);
-            if (Double.isInfinite(dist.get(s))) continue;
-            double prev = obj(front.get(i - 1), objIdx);
-            double next = obj(front.get(i + 1), objIdx);
-            double add = (next - prev) / range;
-            dist.put(s, dist.get(s) + add);
-        }
-    }
-
-    private double obj(SchedulingSolution s, int idx) {
-        if (idx == 1) return s.getF1();
-        if (idx == 2) return s.getF2();
-        return s.getF3();
-    }
-
-    // -----------------------------
-    // Hypervolume (exact) in 3D minimization
-    // -----------------------------
-
-    /**
-     * Exact hypervolume for 3 objectives with minimization.
-     * Uses transformation to maximization: (x,y,z) = (ref - f).
-     * Computes union of boxes from origin to each point in transformed space.
-     */
-    private double hypervolume3DMin(List<SchedulingSolution> archive, double[] ref) {
-        if (archive == null || archive.isEmpty()) return 0.0;
-
-        // Keep only points strictly within ref (otherwise contribute 0 or negative)
-        List<double[]> pts = new ArrayList<>();
-        for (SchedulingSolution s : archive) {
-            double x = ref[0] - s.getF1();
-            double y = ref[1] - s.getF2();
-            double z = ref[2] - s.getF3();
-            if (x > 0 && y > 0 && z > 0) pts.add(new double[]{x, y, z});
-        }
-        if (pts.isEmpty()) return 0.0;
-
-        // Remove dominated in transformed maximization space
-        pts = nonDominatedMax(pts);
-
-        // Sort by x descending (bigger x = better)
-        pts.sort((a, b) -> Double.compare(b[0], a[0]));
-
-        double hv = 0.0;
-
-        for (int i = 0; i < pts.size(); i++) {
-            double x_i = pts.get(i)[0];
-            double x_next = (i + 1 < pts.size()) ? pts.get(i + 1)[0] : 0.0;
-            double dx = x_i - x_next;
-            if (dx <= 0) continue;
-
-            // Collect (y,z) of points with x >= x_next (which is pts[0..i])
-            List<double[]> yz = new ArrayList<>(i + 1);
-            for (int k = 0; k <= i; k++) yz.add(new double[]{pts.get(k)[1], pts.get(k)[2]});
-
-            double area = hypervolume2DMax(yz);
-            hv += dx * area;
-        }
-
-        return hv;
-    }
-
-    private List<double[]> nonDominatedMax(List<double[]> pts) {
-        List<double[]> nd = new ArrayList<>();
-        for (int i = 0; i < pts.size(); i++) {
-            double[] p = pts.get(i);
-            boolean dom = false;
-            for (int j = 0; j < pts.size(); j++) {
-                if (i == j) continue;
-                if (dominatesMax(pts.get(j), p)) { dom = true; break; }
-            }
-            if (!dom) nd.add(p);
-        }
-        return nd;
-    }
-
-    private boolean dominatesMax(double[] a, double[] b) {
-        // Maximization dominance in 3D
-        boolean strictly = false;
-        if (a[0] < b[0]) return false;
-        if (a[1] < b[1]) return false;
-        if (a[2] < b[2]) return false;
-        if (a[0] > b[0]) strictly = true;
-        if (a[1] > b[1]) strictly = true;
-        if (a[2] > b[2]) strictly = true;
-        return strictly;
-    }
-
-    /**
-     * Exact hypervolume in 2D maximization for boxes from origin to (y,z).
-     * Standard O(n log n): sort by y desc, keep max z envelope.
-     */
-    private double hypervolume2DMax(List<double[]> yz) {
-        if (yz.isEmpty()) return 0.0;
-
-        // Remove dominated in 2D max
-        yz = nonDominated2DMax(yz);
-
-        // Sort by y descending
-        yz.sort((a, b) -> Double.compare(b[0], a[0]));
-
-        double area = 0.0;
-        double prevY = 0.0;
-        double bestZ = 0.0;
-
-        for (int i = 0; i < yz.size(); i++) {
-            double y = yz.get(i)[0];
-            double z = yz.get(i)[1];
-
-            if (i == 0) {
-                prevY = y;
-                bestZ = z;
-                continue;
-            }
-
-            // strip from prevY down to y uses bestZ
-            double dy = prevY - y;
-            if (dy > 0) area += dy * bestZ;
-
-            // update envelope
-            if (z > bestZ) bestZ = z;
-            prevY = y;
-        }
-
-        // last strip down to 0
-        if (prevY > 0) area += prevY * bestZ;
-
-        return area;
-    }
-
-    private List<double[]> nonDominated2DMax(List<double[]> pts) {
-        List<double[]> nd = new ArrayList<>();
-        for (int i = 0; i < pts.size(); i++) {
-            double[] p = pts.get(i);
-            boolean dom = false;
-            for (int j = 0; j < pts.size(); j++) {
-                if (i == j) continue;
-                if (dominates2DMax(pts.get(j), p)) { dom = true; break; }
-            }
-            if (!dom) nd.add(p);
-        }
-        return nd;
-    }
-
-    private boolean dominates2DMax(double[] a, double[] b) {
-        boolean strictly = false;
-        if (a[0] < b[0]) return false;
-        if (a[1] < b[1]) return false;
-        if (a[0] > b[0]) strictly = true;
-        if (a[1] > b[1]) strictly = true;
-        return strictly;
-    }
-
-    // -----------------------------
-    // Local search
+    // Recherche locale
     // -----------------------------
 
     private void applyLocalSearch(List<SchedulingSolution> population) {
@@ -508,7 +272,7 @@ public class MOJellyfishOptimizer {
     }
 
     // -----------------------------
-    // Movement utilities
+    // Utilitaires mouvement
     // -----------------------------
 
     private double[] computeMeanPosition(List<SchedulingSolution> pop) {
@@ -542,7 +306,7 @@ public class MOJellyfishOptimizer {
         return best;
     }
 
-    // Simple scalarization only for leader selection and elite local search ordering
+    // Scalarisation simple uniquement pour : sélection leader + tri élites (pas pour le Pareto)
     private double scalarScore(SchedulingSolution s) {
         return s.getF1() + 1000.0 * s.getF2() + 0.01 * s.getF3();
     }
@@ -552,6 +316,64 @@ public class MOJellyfishOptimizer {
         for (int i = 0; i < a.length; i++) x[i] = a[i];
         return x;
     }
+
+    // -----------------------------
+    // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
+    // -----------------------------
+
+    /**
+     * Traduit un mouvement continu (targetPos) en une nouvelle affectation discrète :
+     * - on part de l'affectation courante
+     * - on choisit k tâches à modifier (k dépend de t)
+     * - pour chaque tâche : soit on suit la suggestion (arrondi local), soit on explore aléatoirement
+     * - on ajoute un léger bruit additionnel pour éviter la stagnation
+     */
+    private int[] applyDiscreteMove(int[] currentAssign, double[] targetPos, double t) {
+        int nTasks = currentAssign.length;
+        int nNodes = nodes.size();
+
+        int[] next = currentAssign.clone();
+
+        // Nombre de tâches modifiées : décroît avec le temps (plus d'exploration au début)
+        double ratio = changeRatioMax - (changeRatioMax - changeRatioMin) * t;
+        int k = Math.max(1, (int) Math.round(ratio * nTasks));
+
+        // Probabilité de suivre la suggestion (guidé) : décroît avec t
+        double guidedProb = guidedProbStart - (guidedProbStart - guidedProbEnd) * t;
+
+        for (int i = 0; i < k; i++) {
+            int taskIdx = rand.nextInt(nTasks);
+
+            int suggestedNode = clamp((int) Math.round(targetPos[taskIdx]), 0, nNodes - 1);
+
+            if (rand.nextDouble() < guidedProb) {
+                // Réaffectation guidée : on suit la direction proposée
+                next[taskIdx] = suggestedNode;
+            } else {
+                // Réaffectation aléatoire : exploration
+                next[taskIdx] = rand.nextInt(nNodes);
+            }
+        }
+
+        // Bruit additionnel léger (évite les solutions identiques)
+        for (int i = 0; i < nTasks; i++) {
+            if (rand.nextDouble() < extraMutation) {
+                next[i] = rand.nextInt(nNodes);
+            }
+        }
+
+        return next;
+    }
+
+    private int clamp(int v, int lo, int hi) {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return v;
+    }
+
+    // -----------------------------
+    // Anciennes méthodes de discrétisation (non utilisées maintenant)
+    // -----------------------------
 
     private int[] discretize(double[] pos, int nodeCount) {
         int[] r = new int[pos.length];
@@ -582,7 +404,127 @@ public class MOJellyfishOptimizer {
         }
     }
 
-    // Lévy step
+    // -----------------------------
+    // Hypervolume exact (3D minimisation)
+    // -----------------------------
+
+    private double hypervolume3DMin(List<SchedulingSolution> archive, double[] ref) {
+        if (archive == null || archive.isEmpty()) return 0.0;
+
+        List<double[]> pts = new ArrayList<>();
+        for (SchedulingSolution s : archive) {
+            double x = ref[0] - s.getF1();
+            double y = ref[1] - s.getF2();
+            double z = ref[2] - s.getF3();
+            if (x > 0 && y > 0 && z > 0) pts.add(new double[]{x, y, z});
+        }
+        if (pts.isEmpty()) return 0.0;
+
+        pts = nonDominatedMax(pts);
+        pts.sort((a, b) -> Double.compare(b[0], a[0]));
+
+        double hv = 0.0;
+
+        for (int i = 0; i < pts.size(); i++) {
+            double x_i = pts.get(i)[0];
+            double x_next = (i + 1 < pts.size()) ? pts.get(i + 1)[0] : 0.0;
+            double dx = x_i - x_next;
+            if (dx <= 0) continue;
+
+            List<double[]> yz = new ArrayList<>(i + 1);
+            for (int k = 0; k <= i; k++) yz.add(new double[]{pts.get(k)[1], pts.get(k)[2]});
+
+            double area = hypervolume2DMax(yz);
+            hv += dx * area;
+        }
+
+        return hv;
+    }
+
+    private List<double[]> nonDominatedMax(List<double[]> pts) {
+        List<double[]> nd = new ArrayList<>();
+        for (int i = 0; i < pts.size(); i++) {
+            double[] p = pts.get(i);
+            boolean dom = false;
+            for (int j = 0; j < pts.size(); j++) {
+                if (i == j) continue;
+                if (dominatesMax(pts.get(j), p)) { dom = true; break; }
+            }
+            if (!dom) nd.add(p);
+        }
+        return nd;
+    }
+
+    private boolean dominatesMax(double[] a, double[] b) {
+        boolean strictly = false;
+        if (a[0] < b[0]) return false;
+        if (a[1] < b[1]) return false;
+        if (a[2] < b[2]) return false;
+        if (a[0] > b[0]) strictly = true;
+        if (a[1] > b[1]) strictly = true;
+        if (a[2] > b[2]) strictly = true;
+        return strictly;
+    }
+
+    private double hypervolume2DMax(List<double[]> yz) {
+        if (yz.isEmpty()) return 0.0;
+
+        yz = nonDominated2DMax(yz);
+        yz.sort((a, b) -> Double.compare(b[0], a[0]));
+
+        double area = 0.0;
+        double prevY = 0.0;
+        double bestZ = 0.0;
+
+        for (int i = 0; i < yz.size(); i++) {
+            double y = yz.get(i)[0];
+            double z = yz.get(i)[1];
+
+            if (i == 0) {
+                prevY = y;
+                bestZ = z;
+                continue;
+            }
+
+            double dy = prevY - y;
+            if (dy > 0) area += dy * bestZ;
+
+            if (z > bestZ) bestZ = z;
+            prevY = y;
+        }
+
+        if (prevY > 0) area += prevY * bestZ;
+
+        return area;
+    }
+
+    private List<double[]> nonDominated2DMax(List<double[]> pts) {
+        List<double[]> nd = new ArrayList<>();
+        for (int i = 0; i < pts.size(); i++) {
+            double[] p = pts.get(i);
+            boolean dom = false;
+            for (int j = 0; j < pts.size(); j++) {
+                if (i == j) continue;
+                if (dominates2DMax(pts.get(j), p)) { dom = true; break; }
+            }
+            if (!dom) nd.add(p);
+        }
+        return nd;
+    }
+
+    private boolean dominates2DMax(double[] a, double[] b) {
+        boolean strictly = false;
+        if (a[0] < b[0]) return false;
+        if (a[1] < b[1]) return false;
+        if (a[0] > b[0]) strictly = true;
+        if (a[1] > b[1]) strictly = true;
+        return strictly;
+    }
+
+    // -----------------------------
+    // Redémarrage + Lévy + Gamma
+    // -----------------------------
+
     private double levySmall() {
         double u = rand.nextGaussian();
         double v = rand.nextGaussian();
@@ -595,7 +537,6 @@ public class MOJellyfishOptimizer {
         return u * sigma / Math.pow(Math.abs(v) + 1e-12, 1.0 / beta);
     }
 
-    // Lanczos gamma approximation
     private double gamma(double x) {
         double[] p = {
                 676.5203681218851,
@@ -614,7 +555,7 @@ public class MOJellyfishOptimizer {
         x -= 1;
         double a = 0.99999999999980993;
         for (int i = 0; i < p.length; i++) a += p[i] / (x + i + 1);
-        double t = x + g + 0.5;
-        return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+        double tt = x + g + 0.5;
+        return Math.sqrt(2 * Math.PI) * Math.pow(tt, x + 0.5) * Math.exp(-tt) * a;
     }
 }

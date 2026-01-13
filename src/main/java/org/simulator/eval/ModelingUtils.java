@@ -9,7 +9,6 @@ import java.util.List;
 
 public class ModelingUtils {
 
-    // affichage lisible du front
     public static void printPareto(String name, List<SchedulingSolution> pareto) {
         System.out.println("\n=== PARETO SOLUTIONS (" + name + ") ===");
         System.out.printf("%-4s %-12s %-15s %-12s%n", "#", "Makespan", "Cost", "Energy");
@@ -22,7 +21,6 @@ public class ModelingUtils {
         }
     }
 
-    // Affichage de l'hypervolume et du pourcentage pour toutes les méthodes
     public static void printMetrics(List<SchedulingSolution> js,
                                     List<SchedulingSolution> aco,
                                     List<SchedulingSolution> random,
@@ -31,7 +29,7 @@ public class ModelingUtils {
 
         System.out.println("\n=== PERFORMANCE METRICS ===");
 
-        System.out.println("\nHypervolume:");
+        System.out.println("\nHypervolume (exact 3D):");
         System.out.println("MOJS   : " + ParetoMetrics.hypervolume(js, refPoint));
         System.out.println("MO-ACO : " + ParetoMetrics.hypervolume(aco, refPoint));
         System.out.println("RANDOM : " + ParetoMetrics.hypervolume(random, refPoint));
@@ -55,11 +53,9 @@ public class ModelingUtils {
         }
     }
 
-
-    // Appel de l'affichage Python
     public static void runPythonPlot(String workflowName) {
         try {
-            String pythonExe = "py";  // potentiellement remplacer par "python" ou "python3"
+            String pythonExe = "py";
 
             ProcessBuilder pb = new ProcessBuilder(
                     pythonExe,
@@ -81,11 +77,8 @@ public class ModelingUtils {
             }
 
             int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                System.out.println("Python script executed successfully.");
-            } else {
-                System.out.println("Python script exited with code " + exitCode);
-            }
+            if (exitCode == 0) System.out.println("Python script executed successfully.");
+            else System.out.println("Python script exited with code " + exitCode);
 
         } catch (Exception e) {
             System.err.println("Error while running Python script:");

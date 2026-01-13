@@ -159,7 +159,7 @@ public class App {
         // 6. Algorithmes naïfs
 
         // Random selection
-        RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100);
+        RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100, 50, new java.util.Random(42));
         List<SchedulingSolution> paretoRandom = randomSel.run();
 
         // Greedy algorithm
