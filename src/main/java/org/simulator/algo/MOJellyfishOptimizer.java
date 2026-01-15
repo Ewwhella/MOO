@@ -27,22 +27,21 @@ import static org.simulator.eval.ParetoUtils.updateArchive;
 public class MOJellyfishOptimizer {
 
     // Paramètres principaux
-    private final int populationSize;
-    private final int maxIter;
-    private final int archiveMaxSize;
+    private final int populationSize; //nombre de méduses/solutions à chaque itération
+    private final int maxIter; //nombre de générations
+    private final int archiveMaxSize; //taille max du front Pareto stocké
 
     // Exploration / exploitation
-    private final double mutationRate = 0.20; // (conservé mais plus utilisé dans la boucle principale)
-    private final double restartRatio = 0.25;
-    private final int stagnationLimit = 6;
+    private final double mutationRate = 0.20; // paramètre de l'ancien mode gardé
+    private final double restartRatio = 0.25; //part de la population remplacée quand stagnation
+    private final int stagnationLimit = 6; //nombre d'itérations sans progrès avant qu'on considère qu'il y a stagnation
 
     // Recherche locale
-    private final double eliteRatio = 0.15;
-    private final double localSearchTasksRatio = 0.10;
+    private final double eliteRatio = 0.15; // % des individus qu'on "polish"
+    private final double localSearchTasksRatio = 0.10; // % des tâches modifiées dans la recherche locale
 
-    // -----------------------------
     // Paramètres de discrétisation (nouveau)
-    // -----------------------------
+
     // Probabilité de suivre le "guide" (arrondi local) au début et à la fin
     private final double guidedProbStart = 0.85;   // au début : plus guidé
     private final double guidedProbEnd   = 0.55;   // à la fin : plus d'exploration
@@ -91,19 +90,20 @@ public class MOJellyfishOptimizer {
 
     /**
      * @param refPoint point de référence pour l'hypervolume : [refF1, refF2, refF3]
-     *                 Mettre null si on ne veut pas calculer l'hypervolume.
+     *                 Mettre null si on veut pas calculer l'hypervolume.
      */
+    //pipeline complet
     public List<SchedulingSolution> run(double[] refPoint) {
 
         // 1) Initialisation population
         List<SchedulingSolution> population = new ArrayList<>(populationSize);
         for (int i = 0; i < populationSize; i++) {
-            SchedulingSolution s = randomSolution();
-            evaluate(s);
+            SchedulingSolution s = randomSolution(); // chaque tâche affectée à un noeud random
+            evaluate(s); // on évalue cette solution
             population.add(s);
         }
 
-        // 2) Initialisation archive Pareto
+        // 2) On fait une première archive de Pareto
         List<SchedulingSolution> archive = updateArchive(Collections.emptyList(), population, archiveMaxSize);
 
         double bestHvSoFar = 0.0;
@@ -114,7 +114,7 @@ public class MOJellyfishOptimizer {
 
             double t = (double) iter / (double) maxIter; // temps normalisé [0,1]
 
-            double[] meanPos = computeMeanPosition(population);
+            double[] meanPos = computeMeanPosition(population); //moyenne des affectations
             SchedulingSolution leader = selectLeader(archive, population);
             double[] leaderPos = toDoubleArray(leader.getAssignment());
 
@@ -161,9 +161,7 @@ public class MOJellyfishOptimizer {
                     }
                 }
 
-                // -----------------------------
                 // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
-                // -----------------------------
                 // Au lieu de faire round() sur tout le vecteur (souvent trop brutal),
                 // on modifie seulement k tâches :
                 // - soit on suit la direction suggérée par newPos (mouvement guidé)
@@ -216,9 +214,7 @@ public class MOJellyfishOptimizer {
         return archive;
     }
 
-    // -----------------------------
     // Construction solution + évaluation
-    // -----------------------------
 
     private SchedulingSolution randomSolution() {
         int[] assign = new int[tasks.size()];
@@ -234,9 +230,7 @@ public class MOJellyfishOptimizer {
         sol.setObjectives(r.getMakespan(), r.getTotalCost(), r.getTotalEnergy());
     }
 
-    // -----------------------------
     // Recherche locale
-    // -----------------------------
 
     private void applyLocalSearch(List<SchedulingSolution> population) {
         int eliteCount = Math.max(1, (int) Math.round(population.size() * eliteRatio));
@@ -274,9 +268,7 @@ public class MOJellyfishOptimizer {
         return best;
     }
 
-    // -----------------------------
     // Utilitaires mouvement
-    // -----------------------------
 
     private double[] computeMeanPosition(List<SchedulingSolution> pop) {
         int dim = tasks.size();
@@ -320,9 +312,7 @@ public class MOJellyfishOptimizer {
         return x;
     }
 
-    // -----------------------------
     // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
-    // -----------------------------
 
     /**
      * Traduit un mouvement continu (targetPos) en une nouvelle affectation discrète :
@@ -374,9 +364,7 @@ public class MOJellyfishOptimizer {
         return v;
     }
 
-    // -----------------------------
     // Anciennes méthodes de discrétisation (non utilisées maintenant)
-    // -----------------------------
 
     private int[] discretize(double[] pos, int nodeCount) {
         int[] r = new int[pos.length];
