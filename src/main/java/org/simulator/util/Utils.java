@@ -3,6 +3,9 @@ package org.simulator.util;
 import org.simulator.core.Node;
 import org.simulator.core.Task;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 public class Utils {
@@ -52,6 +55,58 @@ public class Utils {
         }
 
         return sorted;
+    }
+
+    public static String formatSeconds(long startNano) {
+        double sec = (System.nanoTime() - startNano) / 1_000_000_000.0;
+        return String.format("%.3f s", sec);
+    }
+
+    public static void ensureDir(Path dir) {
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create directory: " + dir, e);
+        }
+    }
+
+    public static double secondsSince(long startNano) {
+        return (System.nanoTime() - startNano) / 1_000_000_000.0;
+    }
+
+    public static void initScenarioSummary(Path summaryCsv) {
+        if (Files.exists(summaryCsv)) return;
+
+        try {
+            Files.write(summaryCsv, ("run,seed,ref_f1,ref_f2,ref_f3,"
+                    + "pareto_mojs,pareto_aco,pareto_random,pareto_greedy,"
+                    + "hv_mojs,hv_aco,hv_random,hv_greedy,"
+                    + "time_mojs_s,time_aco_s,time_random_s,time_greedy_s,time_total_s\n").getBytes());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to init summary CSV: " + summaryCsv, e);
+        }
+    }
+
+    public static void appendScenarioSummary(
+            Path summaryCsv,
+            int runIdx, long seed,
+            double[] ref,
+            int szJS, int szACO, int szR, int szG,
+            double hvJS, double hvACO, double hvR, double hvG,
+            double tJS, double tACO, double tR, double tG,
+            double tTotal
+    ) {
+        String line = runIdx + "," + seed + ","
+                + ref[0] + "," + ref[1] + "," + ref[2] + ","
+                + szJS + "," + szACO + "," + szR + "," + szG + ","
+                + hvJS + "," + hvACO + "," + hvR + "," + hvG + ","
+                + tJS + "," + tACO + "," + tR + "," + tG + "," + tTotal
+                + "\n";
+        try {
+            Files.write(summaryCsv, line.getBytes(), java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to append summary CSV: " + summaryCsv, e);
+        }
     }
 
 }

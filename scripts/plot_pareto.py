@@ -1,20 +1,29 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import sys
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
+import sys
+import numpy as np
 
 def main():
 
-    # Détermine le dossier où les fichiers sont stockées
-    CSV_DIR = os.path.dirname(os.path.abspath(__file__))
+    if len(sys.argv) >= 2:
+        CSV_DIR = sys.argv[1]
+    else:
+        CSV_DIR = os.path.dirname(os.path.abspath(__file__))
+
     print(f"[INFO] Loading CSV from: {CSV_DIR}")
     print(f"[INFO] Saving PNG to the same folder.")
 
+    # Récupère le nom du scénario depuis l'arborescence
+    scenario_dir = os.path.dirname(CSV_DIR)
+    scenario = os.path.basename(scenario_dir)
+    run_name = os.path.basename(CSV_DIR)
+    title_suffix = f"{scenario} / {run_name}"
+
     # Chargement des CSVs
-    mojs   = pd.read_csv(os.path.join(CSV_DIR, "pareto_mojs.csv"))
-    aco    = pd.read_csv(os.path.join(CSV_DIR, "pareto_aco.csv"))
+    mojs = pd.read_csv(os.path.join(CSV_DIR, "pareto_mojs.csv"))
+    aco = pd.read_csv(os.path.join(CSV_DIR, "pareto_aco.csv"))
     random = pd.read_csv(os.path.join(CSV_DIR, "pareto_random.csv"))
     greedy = pd.read_csv(os.path.join(CSV_DIR, "pareto_greedy.csv"))
 
@@ -42,11 +51,17 @@ def main():
     # 2D : f1 vs f2
     plt.figure()
     for name, df in algos.items():
-        plt.scatter(df["f1_makespan"], df["f2_cost"],
-                    label=name, marker=markers[name], color=colors[name], alpha=0.8)
+        plt.scatter(
+            df["f1_makespan"],
+            df["f2_cost"],
+            label=name,
+            marker=markers[name],
+            color=colors[name],
+            alpha=0.8
+        )
     plt.xlabel("Makespan (f1)")
     plt.ylabel("Cost (f2)")
-    plt.title("Pareto fronts: f1 vs f2")
+    plt.title(f"Pareto fronts: f1 vs f2 ({title_suffix})")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -55,11 +70,17 @@ def main():
     # 2D : f1 vs f3
     plt.figure()
     for name, df in algos.items():
-        plt.scatter(df["f1_makespan"], df["f3_energy"],
-                    label=name, marker=markers[name], color=colors[name], alpha=0.8)
+        plt.scatter(
+            df["f1_makespan"],
+            df["f3_energy"],
+            label=name,
+            marker=markers[name],
+            color=colors[name],
+            alpha=0.8
+        )
     plt.xlabel("Makespan (f1)")
     plt.ylabel("Energy (f3)")
-    plt.title("Pareto fronts: f1 vs f3")
+    plt.title(f"Pareto fronts: f1 vs f3 ({title_suffix})")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -70,13 +91,20 @@ def main():
     ax = fig.add_subplot(111, projection="3d")
 
     for name, df in algos.items():
-        ax.scatter(df["f1_makespan"], df["f2_cost"], df["f3_energy"],
-                   label=name, marker=markers[name], color=colors[name], alpha=0.8)
+        ax.scatter(
+            df["f1_makespan"],
+            df["f2_cost"],
+            df["f3_energy"],
+            label=name,
+            marker=markers[name],
+            color=colors[name],
+            alpha=0.8
+        )
 
     ax.set_xlabel("Makespan (f1)")
     ax.set_ylabel("Cost (f2)")
     ax.set_zlabel("Energy (f3)")
-    ax.set_title("3D Pareto fronts")
+    ax.set_title(f"3D Pareto fronts ({title_suffix})")
     ax.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(CSV_DIR, "pareto_3d.png"), dpi=300)
@@ -92,7 +120,7 @@ def main():
 
         plt.xlabel("Generation")
         plt.ylabel("Hypervolume")
-        plt.title("Hypervolume Evolution Over Generations")
+        plt.title(f"Hypervolume Evolution Over Generations ({title_suffix})")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
