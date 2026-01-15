@@ -186,13 +186,16 @@ public class MOJellyfishOptimizer {
 
             // 6) Hypervolume (optionnel) + redémarrage partiel si stagnation
             if (refPoint != null && refPoint.length == 3) {
-                double hv = hypervolume3DMin(archive, refPoint);
-                if (hv > bestHvSoFar) bestHvSoFar = hv;
-                hypervolumeHistory.add(bestHvSoFar);
+                double hv = org.simulator.eval.ParetoMetrics.hypervolume(archive, refPoint);
 
-                // Détection stagnation (sur l'HV brut)
-                if (hv > bestHvSoFar + 1e-9) stagnationCounter = 0;
-                else stagnationCounter++;
+                if (hv > bestHvSoFar + 1e-9) {
+                    bestHvSoFar = hv;
+                    stagnationCounter = 0;
+                } else {
+                    stagnationCounter++;
+                }
+
+                hypervolumeHistory.add(bestHvSoFar);
 
                 if (stagnationCounter >= stagnationLimit) {
                     partialRestart(population);
@@ -402,123 +405,6 @@ public class MOJellyfishOptimizer {
             evaluate(s);
             pop.set(idx, s);
         }
-    }
-
-    // -----------------------------
-    // Hypervolume exact (3D minimisation)
-    // -----------------------------
-
-    private double hypervolume3DMin(List<SchedulingSolution> archive, double[] ref) {
-        if (archive == null || archive.isEmpty()) return 0.0;
-
-        List<double[]> pts = new ArrayList<>();
-        for (SchedulingSolution s : archive) {
-            double x = ref[0] - s.getF1();
-            double y = ref[1] - s.getF2();
-            double z = ref[2] - s.getF3();
-            if (x > 0 && y > 0 && z > 0) pts.add(new double[]{x, y, z});
-        }
-        if (pts.isEmpty()) return 0.0;
-
-        pts = nonDominatedMax(pts);
-        pts.sort((a, b) -> Double.compare(b[0], a[0]));
-
-        double hv = 0.0;
-
-        for (int i = 0; i < pts.size(); i++) {
-            double x_i = pts.get(i)[0];
-            double x_next = (i + 1 < pts.size()) ? pts.get(i + 1)[0] : 0.0;
-            double dx = x_i - x_next;
-            if (dx <= 0) continue;
-
-            List<double[]> yz = new ArrayList<>(i + 1);
-            for (int k = 0; k <= i; k++) yz.add(new double[]{pts.get(k)[1], pts.get(k)[2]});
-
-            double area = hypervolume2DMax(yz);
-            hv += dx * area;
-        }
-
-        return hv;
-    }
-
-    private List<double[]> nonDominatedMax(List<double[]> pts) {
-        List<double[]> nd = new ArrayList<>();
-        for (int i = 0; i < pts.size(); i++) {
-            double[] p = pts.get(i);
-            boolean dom = false;
-            for (int j = 0; j < pts.size(); j++) {
-                if (i == j) continue;
-                if (dominatesMax(pts.get(j), p)) { dom = true; break; }
-            }
-            if (!dom) nd.add(p);
-        }
-        return nd;
-    }
-
-    private boolean dominatesMax(double[] a, double[] b) {
-        boolean strictly = false;
-        if (a[0] < b[0]) return false;
-        if (a[1] < b[1]) return false;
-        if (a[2] < b[2]) return false;
-        if (a[0] > b[0]) strictly = true;
-        if (a[1] > b[1]) strictly = true;
-        if (a[2] > b[2]) strictly = true;
-        return strictly;
-    }
-
-    private double hypervolume2DMax(List<double[]> yz) {
-        if (yz.isEmpty()) return 0.0;
-
-        yz = nonDominated2DMax(yz);
-        yz.sort((a, b) -> Double.compare(b[0], a[0]));
-
-        double area = 0.0;
-        double prevY = 0.0;
-        double bestZ = 0.0;
-
-        for (int i = 0; i < yz.size(); i++) {
-            double y = yz.get(i)[0];
-            double z = yz.get(i)[1];
-
-            if (i == 0) {
-                prevY = y;
-                bestZ = z;
-                continue;
-            }
-
-            double dy = prevY - y;
-            if (dy > 0) area += dy * bestZ;
-
-            if (z > bestZ) bestZ = z;
-            prevY = y;
-        }
-
-        if (prevY > 0) area += prevY * bestZ;
-
-        return area;
-    }
-
-    private List<double[]> nonDominated2DMax(List<double[]> pts) {
-        List<double[]> nd = new ArrayList<>();
-        for (int i = 0; i < pts.size(); i++) {
-            double[] p = pts.get(i);
-            boolean dom = false;
-            for (int j = 0; j < pts.size(); j++) {
-                if (i == j) continue;
-                if (dominates2DMax(pts.get(j), p)) { dom = true; break; }
-            }
-            if (!dom) nd.add(p);
-        }
-        return nd;
-    }
-
-    private boolean dominates2DMax(double[] a, double[] b) {
-        boolean strictly = false;
-        if (a[0] < b[0]) return false;
-        if (a[1] < b[1]) return false;
-        if (a[0] > b[0]) strictly = true;
-        if (a[1] > b[1]) strictly = true;
-        return strictly;
     }
 
     // -----------------------------

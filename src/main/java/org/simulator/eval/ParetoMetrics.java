@@ -8,7 +8,6 @@ import org.simulator.core.Task;
 
 import java.io.FileWriter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class ParetoMetrics {
@@ -187,4 +186,5 @@ public class ParetoMetrics {
         double m = 1.10;
         return new double[]{ maxF1 * m, maxF2 * m, maxF3 * m };
     }
+
 }
