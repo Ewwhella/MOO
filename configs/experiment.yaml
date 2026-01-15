@@ -1,0 +1,64 @@
+# =========================
+# WORKFLOW CONFIGURATION
+# =========================
+workflow:
+  type: CYBERSHAKE        # CYBERSHAKE | DAM
+  cybershake_size: 1000   # 30 | 50 | 100 | 1000
+
+
+# =========================
+# EXECUTION / REPRODUCIBILITY
+# =========================
+execution:
+  base_seed: 42
+  runs_per_scenario: 5
+
+
+# =========================
+# TOPOLOGY / COMPUTE NODES
+# =========================
+nodes:
+
+  edge:
+    count: 5
+    mips: 1000.0
+    cost: 0.5
+    power: 0.7
+    zone: EDGE_DAM
+
+  fog:
+    count: 5
+    mips: 1300.0
+    cost: 0.48
+    power: 0.7
+    zone: FOG_CONTROL
+
+  cloud:
+    count: 5
+    mips: 1600.0
+    cost: 0.96
+    power: 1.648
+    zone: CLOUD_REGION
+
+
+# =========================
+# NETWORK MODEL
+# =========================
+network:
+  propagation_speed_km_per_sec: 200000.0
+
+  variability:
+    enabled: true
+    latency_jitter_max_sec: 0.003
+    bandwidth_jitter_ratio: 0.10
+
+
+# =========================
+# TOPOLOGY SCENARIOS
+# =========================
+scenarios:
+  - DEFAULT
+  - NEAR_CLOUD
+  - FAR_CLOUD
+  - DENSE_FOG
+  - POOR_NETWORK

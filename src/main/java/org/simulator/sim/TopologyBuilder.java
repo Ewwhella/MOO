@@ -9,19 +9,25 @@ import java.util.Random;
 public class TopologyBuilder {
 
     public static class Params {
+        // vitesse de propagation
         public double propagationSpeedKmPerSec = 200000.0;
 
-        public double baseSameTier = 0.002;
-        public double baseEdgeFog = 0.005;
-        public double baseFogCloud = 0.020;
+        // latences de base
+        public double baseSameTier  = 0.002;
+        public double baseEdgeFog   = 0.005;
+        public double baseFogCloud  = 0.020;
         public double baseEdgeCloud = 0.050;
 
-        public double bwSameTierMBps = 800.0;
-        public double bwEdgeFogMBps = 200.0;
-        public double bwFogCloudMBps = 500.0;
+        // bandes passantes
+        public double bwSameTierMBps  = 800.0;
+        public double bwEdgeFogMBps   = 200.0;
+        public double bwFogCloudMBps  = 500.0;
         public double bwEdgeCloudMBps = 100.0;
 
-        public double jitterMaxSec = 0.0;
+        // variabilité réseau
+        public double jitterMaxSec = 0.0;     // ex: 0.003 = 3ms
+        public double bwJitterRatio = 0.0;    // ex: 0.10 = ±10%
+
         public long seed = 0L;
     }
 
@@ -29,7 +35,7 @@ public class TopologyBuilder {
         NetworkModel net = new NetworkModel();
 
         Random rnd = null;
-        if (p.jitterMaxSec > 0.0) {
+        if (p.jitterMaxSec > 0.0 || p.bwJitterRatio > 0.0) {
             rnd = new Random(p.seed);
         }
 
@@ -40,19 +46,27 @@ public class TopologyBuilder {
 
                 Node b = nodes.get(j);
 
+                // --- latence géographique ---
                 double base = baseLatency(a.getType(), b.getType(), p);
                 double distKm = a.distanceTo(b);
-                double prop = distKm / p.propagationSpeedKmPerSec;
+                double propagation = distKm / p.propagationSpeedKmPerSec;
 
-                double jitter = 0.0;
-                if (rnd != null) {
-                    jitter = rnd.nextDouble() * p.jitterMaxSec;
+                double latencySec = base + propagation;
+
+                // jitter structuré
+                if (rnd != null && p.jitterMaxSec > 0.0) {
+                    latencySec += rnd.nextDouble() * p.jitterMaxSec;
                 }
 
-                double latencySec = base + prop + jitter;
-                double bwMBps = bandwidth(a.getType(), b.getType(), p);
+                // --- bande passante ---
+                double bw = bandwidth(a.getType(), b.getType(), p);
 
-                net.setLink(a.getId(), b.getId(), latencySec, bwMBps);
+                if (rnd != null && p.bwJitterRatio > 0.0) {
+                    double r = (rnd.nextDouble() * 2.0 - 1.0) * p.bwJitterRatio;
+                    bw = Math.max(1e-9, bw * (1.0 + r));
+                }
+
+                net.setLink(a.getId(), b.getId(), latencySec, bw);
             }
         }
 
