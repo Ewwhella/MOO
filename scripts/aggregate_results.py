@@ -23,7 +23,6 @@ def parse_metadata_from_path(summary_csv_path: str):
     Exemple :
       results/exp_CyberShake-1000_2026-01-15_10-22-33/DEFAULT/summary.csv
     """
-    # .../<experiment>/<scenario>/summary.csv
     scenario_dir = os.path.dirname(summary_csv_path)
     experiment_dir = os.path.dirname(scenario_dir)
 
@@ -31,16 +30,14 @@ def parse_metadata_from_path(summary_csv_path: str):
     experiment = os.path.basename(experiment_dir)
 
     workflow = "UNKNOWN"
-    # exp_<workflow>_<timestamp>
     if experiment.startswith("exp_"):
         parts = experiment.split("_")
-        # parts = ["exp", "<workflow...>", "<yyyy-mm-dd>", "<hh-mm-ss>"]
         if len(parts) >= 4:
             workflow = parts[1]
         elif len(parts) >= 2:
             workflow = parts[1]
 
-    return experiment, workflow, scenario
+    return experiment, workflow, scenario, scenario_dir
 
 
 def safe_read_summary(path: str):
@@ -57,6 +54,23 @@ def safe_read_summary(path: str):
 
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
+
+
+def mean_col(df: pd.DataFrame, col: str):
+    if col not in df.columns:
+        return float("nan")
+    return float(pd.to_numeric(df[col], errors="coerce").mean())
+
+
+def barplot_one_metric(algo_labels, values, ylabel, title, out_path):
+    plt.figure(figsize=(9, 5))
+    plt.bar(algo_labels, values)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True, axis="y", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=300)
+    plt.close()
 
 
 def main():
@@ -81,7 +95,7 @@ def main():
     all_rows = []
 
     for path in summary_csvs:
-        meta_experiment, meta_workflow, meta_scenario = parse_metadata_from_path(path)
+        meta_experiment, meta_workflow, meta_scenario, meta_scenario_dir = parse_metadata_from_path(path)
         df = safe_read_summary(path)
         if df is None or df.empty:
             continue
@@ -91,6 +105,7 @@ def main():
         df.insert(0, "workflow", meta_workflow)
         df.insert(0, "experiment", meta_experiment)
         df.insert(0, "summary_path", path)
+        df.insert(0, "scenario_dir", meta_scenario_dir)
 
         all_rows.append(df)
 
@@ -100,55 +115,24 @@ def main():
 
     full = pd.concat(all_rows, ignore_index=True)
 
-    # Normalise colonnes attendues (sans runtime)
+    # Colonnes attendues (on ajoute aussi les "best" F1/F2/F3 si présents)
     expected_cols = [
         "run", "seed",
         "ref_f1", "ref_f2", "ref_f3",
         "pareto_mojs", "pareto_aco", "pareto_random", "pareto_greedy",
         "hv_mojs", "hv_aco", "hv_random", "hv_greedy",
+        # best objectives (min on Pareto) — si tu les ajoutes dans summary.csv côté Java
+        "best_f1_mojs", "best_f2_mojs", "best_f3_mojs",
+        "best_f1_aco", "best_f2_aco", "best_f3_aco",
+        "best_f1_random", "best_f2_random", "best_f3_random",
+        "best_f1_greedy", "best_f2_greedy", "best_f3_greedy",
     ]
     missing = [c for c in expected_cols if c not in full.columns]
     if missing:
-        print("[WARN] Missing columns in summaries:", missing)
+        print("[WARN] Missing columns in summaries (ok if not yet added):", missing)
 
-    # Dossier de sortie
-    out_dir = os.path.join(root, "_aggregate")
-    ensure_dir(out_dir)
-
-    # 1) CSV global
-    full_csv_path = os.path.join(out_dir, "all_runs.csv")
-    full.to_csv(full_csv_path, index=False)
-    print(f"[INFO] Wrote: {full_csv_path}")
-
-    # 2) Agrégation par (experiment, workflow, scenario)
-    group_keys = ["experiment", "workflow", "scenario"]
-
-    metrics_hv = ["hv_mojs", "hv_aco", "hv_random", "hv_greedy"]
-    metrics_size = ["pareto_mojs", "pareto_aco", "pareto_random", "pareto_greedy"]
-
-    agg_cols = metrics_hv + metrics_size
-    existing_agg_cols = [c for c in agg_cols if c in full.columns]
-
-    agg = (
-        full.groupby(group_keys)[existing_agg_cols]
-        .agg(["mean", "std", "min", "max", "count"])
-        .reset_index()
-    )
-
-    # Aplatissement des colonnes multi-index
-    agg.columns = [
-        col if isinstance(col, str) else f"{col[0]}_{col[1]}"
-        for col in agg.columns
-    ]
-
-    agg_csv_path = os.path.join(out_dir, "scenario_aggregate.csv")
-    agg.to_csv(agg_csv_path, index=False)
-    print(f"[INFO] Wrote: {agg_csv_path}")
-
-    # Pour plots : on fait une vue "par scenario" sur le dernier experiment (ou tous)
+    # Sélection experiment (si root est un exp_...)
     experiments = sorted(full["experiment"].unique())
-    selected_experiment = None
-
     base_name = os.path.basename(root)
     if base_name.startswith("exp_"):
         selected_experiment = base_name
@@ -162,53 +146,99 @@ def main():
 
     print(f"[INFO] Plot selection: experiment={selected_experiment}")
 
-    # 3) Barplot HV moyen par scénario (4 algos)
-    hv_means = (
-        df_sel.groupby("scenario")[metrics_hv]
-        .mean(numeric_only=True)
-        .reset_index()
-        .sort_values("scenario")
-    )
+    # Output: on écrit dans CHAQUE dossier scenario
+    # (si tu as un seul scénario, ça fera juste un dossier)
+    algo_labels = ["MOJS", "ACO", "RANDOM", "GREEDY"]
 
-    plt.figure(figsize=(10, 5))
-    x = range(len(hv_means["scenario"]))
-    width = 0.2
+    metrics_hv_cols = ["hv_mojs", "hv_aco", "hv_random", "hv_greedy"]
 
-    offsets = {
-        "hv_mojs": -1.5 * width,
-        "hv_aco": -0.5 * width,
-        "hv_random": 0.5 * width,
-        "hv_greedy": 1.5 * width
+    # best objectives cols
+    best_cols = {
+        "makespan": ["best_f1_mojs", "best_f1_aco", "best_f1_random", "best_f1_greedy"],
+        "cost": ["best_f2_mojs", "best_f2_aco", "best_f2_random", "best_f2_greedy"],
+        "energy": ["best_f3_mojs", "best_f3_aco", "best_f3_random", "best_f3_greedy"],
     }
 
-    for m in metrics_hv:
-        if m not in hv_means.columns:
-            continue
-        plt.bar(
-            [i + offsets[m] for i in x],
-            hv_means[m].values,
-            width=width,
-            label=m.replace("hv_", "").upper()
+    need_best = sum(best_cols.values(), [])
+    have_all_best = all(c in df_sel.columns for c in need_best)
+
+    if not have_all_best:
+        print("[WARN] Missing best_f* columns in summary.csv. "
+              "Add them in Java (appendScenarioSummary) to enable cost/makespan/energy plots.")
+
+    # groupe par scenario (même si un seul)
+    for scenario, df_sc in df_sel.groupby("scenario"):
+        scenario_dir = df_sc["scenario_dir"].iloc[0]
+        out_dir = scenario_dir
+        ensure_dir(out_dir)
+
+        # 1) CSV runs (optionnel mais pratique)
+        full_csv_path = os.path.join(out_dir, "all_runs.csv")
+        df_sc.to_csv(full_csv_path, index=False)
+        print(f"[INFO] Wrote: {full_csv_path}")
+
+        # 2) HV mean by algo
+        hv_vals = [mean_col(df_sc, c) for c in metrics_hv_cols]
+        hv_plot_path = os.path.join(out_dir, f"hv_mean_by_algo_{selected_experiment}_{scenario}.png")
+        barplot_one_metric(
+            algo_labels,
+            hv_vals,
+            ylabel="Hypervolume (mean over runs)",
+            title=f"HV mean by algorithm ({selected_experiment} | {scenario})",
+            out_path=hv_plot_path
         )
+        print(f"[INFO] Wrote: {hv_plot_path}")
 
-    plt.xticks(list(x), hv_means["scenario"].tolist(), rotation=20, ha="right")
-    plt.ylabel("Hypervolume (mean)")
-    plt.title(f"Hypervolume mean by scenario ({selected_experiment})")
-    plt.grid(True, axis="y", linestyle="--", alpha=0.5)
-    plt.legend()
-    plt.tight_layout()
+        # 3) Cost / Makespan / Energy mean by algo (si dispo)
+        if have_all_best:
+            makespan_vals = [mean_col(df_sc, c) for c in best_cols["makespan"]]
+            cost_vals = [mean_col(df_sc, c) for c in best_cols["cost"]]
+            energy_vals = [mean_col(df_sc, c) for c in best_cols["energy"]]
 
-    hv_plot_path = os.path.join(out_dir, f"hv_mean_by_scenario_{selected_experiment}.png")
-    plt.savefig(hv_plot_path, dpi=300)
-    print(f"[INFO] Wrote: {hv_plot_path}")
+            makespan_plot = os.path.join(out_dir, f"makespan_min_on_pareto_mean_by_algo_{selected_experiment}_{scenario}.png")
+            cost_plot = os.path.join(out_dir, f"cost_min_on_pareto_mean_by_algo_{selected_experiment}_{scenario}.png")
+            energy_plot = os.path.join(out_dir, f"energy_min_on_pareto_mean_by_algo_{selected_experiment}_{scenario}.png")
 
-    # 4) Petit CSV HV par scenario pour l’experiment sélectionné
-    mini_path = os.path.join(out_dir, f"selected_experiment_hv_summary_{selected_experiment}.csv")
-    hv_means.to_csv(mini_path, index=False)
-    print(f"[INFO] Wrote: {mini_path}")
+            barplot_one_metric(
+                algo_labels,
+                makespan_vals,
+                ylabel="Makespan (min on Pareto), mean over runs",
+                title=f"Makespan (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
+                out_path=makespan_plot
+            )
+            print(f"[INFO] Wrote: {makespan_plot}")
+
+            barplot_one_metric(
+                algo_labels,
+                cost_vals,
+                ylabel="Cost (min on Pareto), mean over runs",
+                title=f"Cost (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
+                out_path=cost_plot
+            )
+            print(f"[INFO] Wrote: {cost_plot}")
+
+            barplot_one_metric(
+                algo_labels,
+                energy_vals,
+                ylabel="Energy (min on Pareto), mean over runs",
+                title=f"Energy (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
+                out_path=energy_plot
+            )
+            print(f"[INFO] Wrote: {energy_plot}")
+
+            # 4) petit CSV récap (algo_means)
+            comp = pd.DataFrame({
+                "algo": algo_labels,
+                "hv_mean": hv_vals,
+                "makespan_min_mean": makespan_vals,
+                "cost_min_mean": cost_vals,
+                "energy_min_mean": energy_vals,
+            })
+            comp_csv = os.path.join(out_dir, f"algo_means_{selected_experiment}_{scenario}.csv")
+            comp.to_csv(comp_csv, index=False)
+            print(f"[INFO] Wrote: {comp_csv}")
 
     print("\n[OK] Aggregation done.")
-    print(f"[INFO] Output folder: {out_dir}")
 
 
 if __name__ == "__main__":

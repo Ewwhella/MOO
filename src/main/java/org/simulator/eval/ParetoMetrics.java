@@ -9,6 +9,7 @@ import org.simulator.core.Task;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class ParetoMetrics {
 
@@ -172,8 +173,8 @@ public class ParetoMetrics {
     // -----------------------------
     // Auto ref point
     // -----------------------------
-    public static double[] computeAutoRefPoint(List<Task> tasks, List<Node> nodes, NetworkModel net) {
-        RandomSelection rs = new RandomSelection(tasks, nodes, net, 100, 50, new java.util.Random(42));
+    public static double[] computeAutoRefPoint(List<Task> tasks, List<Node> nodes, NetworkModel net, Random rnd) {
+        RandomSelection rs = new RandomSelection(tasks, nodes, net, 100, 50, rnd);
 
         double maxF1 = 0, maxF2 = 0, maxF3 = 0;
 

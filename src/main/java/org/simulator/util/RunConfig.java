@@ -17,7 +17,7 @@ public class RunConfig {
 
     public static class Execution {
         public long base_seed;
-        public int runs_per_scenario;
+        public int runs;
     }
 
     public static class Nodes {
@@ -51,7 +51,7 @@ public class RunConfig {
         if (nodes == null) throw new IllegalArgumentException("Missing 'nodes' in YAML");
         if (network == null) throw new IllegalArgumentException("Missing 'network' in YAML");
         if (workflow.type == null) throw new IllegalArgumentException("Missing 'workflow.type'");
-        if (execution.runs_per_scenario <= 0) throw new IllegalArgumentException("'execution.runs_per_scenario' must be > 0");
+        if (execution.runs <= 0) throw new IllegalArgumentException("'execution.runs_per_scenario' must be > 0");
         if (nodes.edge == null || nodes.fog == null || nodes.cloud == null)
             throw new IllegalArgumentException("Missing nodes.edge/fog/cloud");
     }

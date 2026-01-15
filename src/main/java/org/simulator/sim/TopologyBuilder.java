@@ -13,10 +13,10 @@ public class TopologyBuilder {
         public double propagationSpeedKmPerSec = 200000.0;
 
         // latences de base
-        public double baseSameTier  = 0.002;
-        public double baseEdgeFog   = 0.005;
-        public double baseFogCloud  = 0.020;
-        public double baseEdgeCloud = 0.050;
+        public double baseSameTier  = 0.02;
+        public double baseEdgeFog   = 0.05;
+        public double baseFogCloud  = 0.20;
+        public double baseEdgeCloud = 0.50;
 
         // bandes passantes
         public double bwSameTierMBps  = 800.0;

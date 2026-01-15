@@ -11,7 +11,7 @@ workflow:
 # =========================
 execution:
   base_seed: 42
-  runs_per_scenario: 5
+  runs: 5
 
 
 # =========================
@@ -45,7 +45,7 @@ nodes:
 # NETWORK MODEL
 # =========================
 network:
-  propagation_speed_km_per_sec: 200000.0
+  propagation_speed_km_per_sec: 20000.0
 
   variability:
     enabled: true
@@ -57,8 +57,4 @@ network:
 # TOPOLOGY SCENARIOS
 # =========================
 scenarios:
-  - DEFAULT
-  - NEAR_CLOUD
-  - FAR_CLOUD
-  - DENSE_FOG
-  - POOR_NETWORK
+  - DEFAULT               # DEFAULT | NEAR_CLOUD | FAR_CLOUD | DENSE_FOG | POOR_NETWORK
