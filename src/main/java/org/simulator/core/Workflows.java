@@ -70,9 +70,12 @@ public final class Workflows {
             case 100:
                 filename = "CyberShake_100.xml";
                 break;
+            case 1000:
+                filename = "CyberShake_1000.xml";
+                break;
             default:
                 throw new IllegalArgumentException("Unsupported CyberShake size: " + size
-                        + " (expected 30, 50 or 100)");
+                        + " (expected 30, 50, 100 or 1000)");
         }
         return loadCyberShakeFromXML(filename);
     }
