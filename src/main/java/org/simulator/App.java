@@ -11,9 +11,11 @@ import org.simulator.core.Task;
 import org.simulator.core.Workflows;
 import org.simulator.eval.ModelingUtils;
 import org.simulator.eval.ParetoMetrics;
+import org.simulator.sim.TopologyBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class App {
 
@@ -24,8 +26,11 @@ public class App {
     // true  -> workflow CyberShake
     private static final boolean USE_CYBERSHAKE = true;
 
-    // Taille du workflow CyberShake (30, 50 ou 100)
-    private static final int CYBERSHAKE_SIZE = 50;
+    // Taille du workflow CyberShake (30, 50, 100 ou 1000)
+    private static final int CYBERSHAKE_SIZE = 1000;
+
+    // Seed (reproductibilité)
+    private static final long SEED = 42L;
 
     public static void main(String[] args) {
 
@@ -35,36 +40,71 @@ public class App {
 
         List<Node> nodes = new ArrayList<>();
 
+        Random rnd = new Random(SEED);
+
+        // Zones (coordonnées abstraites en "km")
+        double damX = 0.0;
+        double damY = 0.0;
+
+        double fogX = 30.0;
+        double fogY = 10.0;
+
+        double cloudX = 300.0;
+        double cloudY = 200.0;
+
+        // Jitter de placement (km)
+        double edgeJitter = 2.0;
+        double fogJitter = 5.0;
+        double cloudJitter = 20.0;
+
         // Edge : 5 machines
         for (int i = 1; i <= 5; i++) {
+            double x = damX + (rnd.nextDouble() * 2.0 - 1.0) * edgeJitter;
+            double y = damY + (rnd.nextDouble() * 2.0 - 1.0) * edgeJitter;
+
             nodes.add(new Node(
                     "edge" + i,
                     Node.Type.EDGE,
                     1000.0,    // MIPS
-                    0.0,       // coût(€)/secondes
-                    0.700      // énergie (W) = 700 mW
+                    0.5,       // coût(€)/secondes
+                    0.700,     // énergie (W) = 700 mW
+                    x,
+                    y,
+                    "EDGE_DAM"
             ));
         }
 
         // Fog : 5 machines
         for (int i = 1; i <= 5; i++) {
+            double x = fogX + (rnd.nextDouble() * 2.0 - 1.0) * fogJitter;
+            double y = fogY + (rnd.nextDouble() * 2.0 - 1.0) * fogJitter;
+
             nodes.add(new Node(
                     "fog" + i,
                     Node.Type.FOG,
                     1300.0,
                     0.48,
-                    0.700      // 700 mW
+                    0.700,     // 700 mW
+                    x,
+                    y,
+                    "FOG_CONTROL"
             ));
         }
 
         // Cloud : 5 machines
         for (int i = 1; i <= 5; i++) {
+            double x = cloudX + (rnd.nextDouble() * 2.0 - 1.0) * cloudJitter;
+            double y = cloudY + (rnd.nextDouble() * 2.0 - 1.0) * cloudJitter;
+
             nodes.add(new Node(
                     "cloud" + i,
                     Node.Type.CLOUD,
                     1600.0,
                     0.96,
-                    1.648      // 1648 mW
+                    1.648,     // 1648 mW
+                    x,
+                    y,
+                    "CLOUD_REGION"
             ));
         }
 
@@ -88,43 +128,24 @@ public class App {
 
         // 3. Network Model
 
-        NetworkModel net = new NetworkModel();
+        TopologyBuilder.Params tp = new TopologyBuilder.Params();
+        tp.seed = SEED;
 
-        // Edge <-> Fog
-        for (Node e : nodes) if (e.isEdge()) {
-            for (Node f : nodes) if (f.isFog()) {
-                net.setLink(e.getId(), f.getId(),
-                        0.01,      // latence (s)
-                        20480.0);  // bande passante (MB/s) environ 20480 Mbps
-                net.setLink(f.getId(), e.getId(),
-                        0.01,
-                        20480.0);
-            }
-        }
+        tp.propagationSpeedKmPerSec = 200000.0;
 
-        // Fog <-> Cloud
-        for (Node f : nodes) if (f.isFog()) {
-            for (Node c : nodes) if (c.isCloud()) {
-                net.setLink(f.getId(), c.getId(),
-                        0.05,      // latence (s)
-                        10000.0);  // bande passante (MB/s)
-                net.setLink(c.getId(), f.getId(),
-                        0.05,
-                        10000.0);
-            }
-        }
+        tp.baseSameTier = 0.002;
+        tp.baseEdgeFog = 0.005;
+        tp.baseFogCloud = 0.020;
+        tp.baseEdgeCloud = 0.050;
 
-        // Edge <-> Cloud (lien plus faible)
-        for (Node e : nodes) if (e.isEdge()) {
-            for (Node c : nodes) if (c.isCloud()) {
-                net.setLink(e.getId(), c.getId(),
-                        0.10,
-                        100.0);    // MB/s
-                net.setLink(c.getId(), e.getId(),
-                        0.10,
-                        100.0);
-            }
-        }
+        tp.bwSameTierMBps = 800.0;
+        tp.bwEdgeFogMBps = 200.0;
+        tp.bwFogCloudMBps = 500.0;
+        tp.bwEdgeCloudMBps = 100.0;
+
+        tp.jitterMaxSec = 0.0;
+
+        NetworkModel net = TopologyBuilder.build(nodes, tp);
 
         // 4. refPoint (calculé automatiquement)
 
