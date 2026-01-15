@@ -143,9 +143,15 @@ public class MOACOOptimizer {
 
             archive = ParetoUtils.updateArchive(archive, ants, archiveMaxSize);
 
-            // suivi HV
+            // suivi HV (monotone = best-so-far, comme MOJS)
             double hv = ParetoMetrics.hypervolume(archive, refPoint);
-            hypervolumeHistory.add(hv);
+
+            double bestSoFar = hv;
+            if (!hypervolumeHistory.isEmpty()) {
+                bestSoFar = Math.max(hypervolumeHistory.get(hypervolumeHistory.size() - 1), hv);
+            }
+            hypervolumeHistory.add(bestSoFar);
+
 
             evaporate();
             deposit(archive);

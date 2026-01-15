@@ -22,7 +22,6 @@ public class ModelingUtils {
         }
     }
 
-    // Affichage de l'hypervolume et du pourcentage pour toutes les méthodes
     public static void printMetrics(List<SchedulingSolution> js,
                                     List<SchedulingSolution> aco,
                                     List<SchedulingSolution> random,
@@ -31,7 +30,7 @@ public class ModelingUtils {
 
         System.out.println("\n=== PERFORMANCE METRICS ===");
 
-        System.out.println("\nHypervolume:");
+        System.out.println("\nHypervolume (exact 3D):");
         System.out.println("MOJS   : " + ParetoMetrics.hypervolume(js, refPoint));
         System.out.println("MO-ACO : " + ParetoMetrics.hypervolume(aco, refPoint));
         System.out.println("RANDOM : " + ParetoMetrics.hypervolume(random, refPoint));

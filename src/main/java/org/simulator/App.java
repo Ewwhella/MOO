@@ -220,7 +220,7 @@ public class App {
 
                 System.out.println("\nRunning RANDOM baseline...");
                 start = System.nanoTime();
-                RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100);
+                RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100, 50, new java.util.Random(42));
                 List<SchedulingSolution> paretoRandom = randomSel.run();
                 double randomSec = secondsSince(start);
                 System.out.println("RANDOM done in " + String.format("%.3f s", randomSec));
