@@ -86,6 +86,25 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(CSV_DIR, "pareto_f1_f3.png"), dpi=300)
 
+    # 2D : f2 vs f3
+    plt.figure()
+    for name, df in algos.items():
+        plt.scatter(
+            df["f2_cost"],
+            df["f3_energy"],
+            label=name,
+            marker=markers[name],
+            color=colors[name],
+            alpha=0.8
+        )
+    plt.xlabel("Cost (f2")
+    plt.ylabel("Energy (f3)")
+    plt.title(f"Pareto fronts: f2 vs f3 ({title_suffix})")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(CSV_DIR, "pareto_f2_f3.png"), dpi=300)
+
     # 3D : f1, f2, f3
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
