@@ -1,7 +1,22 @@
 package org.simulator.core;
 
+/**
+ * Représente un noeud de calcul.
+ *
+ * Chaque noeud possède des caractéristiques materielles (puissance de calcul),
+ * économiques (coût d'utilisation), énergétiques (consommation) et géographiques
+ * (position dans l'espace).
+ *
+ * Les trois types de noeuds correspondent a une architecture hierarchique :
+ * - EDGE : Noeuds en bordure, proches des capteurs, faible latence mais ressources limitees
+ * - FOG : Noeuds intermediaires offrant un compromis entre latence et puissance de calcul
+ * - CLOUD : Noeuds distants avec ressources importantes mais latence elevee
+ */
 public class Node {
 
+    /**
+     * Type de noeud dans l'architecture hierarchique fog/edge/cloud.
+     */
     public enum Type {
         FOG,
         CLOUD,
@@ -79,6 +94,15 @@ public class Node {
         return this.type == Type.EDGE;
     }
 
+    /**
+     * Calcule la distance euclidienne entre ce noeud et un autre noeud.
+     * Cette distance geographique est utilisee pour calculer les latences
+     * de propagation reseau : plus les noeuds sont eloignes, plus la latence
+     * de communication sera elevee.
+     *
+     * @param other L'autre noeud pour lequel calculer la distance
+     * @return Distance euclidienne en kilometres
+     */
     public double distanceTo(Node other) {
         double dx = this.x - other.x;
         double dy = this.y - other.y;

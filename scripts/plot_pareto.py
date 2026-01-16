@@ -97,7 +97,7 @@ def main():
             color=colors[name],
             alpha=0.8
         )
-    plt.xlabel("Cost (f2")
+    plt.xlabel("Cost (f2)")
     plt.ylabel("Energy (f3)")
     plt.title(f"Pareto fronts: f2 vs f3 ({title_suffix})")
     plt.legend()

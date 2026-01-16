@@ -3,7 +3,7 @@
 ## Présentation
 
 Ce projet implémente un **simulateur de planification de workflows multi-objectifs** dans un environnement **Edge–Fog–Cloud**.
-Il traite le **problème classique de workflow scheduling** en affectant des tâches à des nœuds de calcul hétérogènes, tout en optimisant plusieurs objectifs contradictoires.
+Il traite le **problème classique de workflow scheduling** en affectant des tâches à des noeuds de calcul hétérogènes, tout en optimisant plusieurs objectifs contradictoires.
 
 Le simulateur permet de comparer des **métaheuristiques Pareto-basées** et des algorithmes de référence sur différents **scénarios de topologie réseau**, à l’aide de métriques standard d’optimisation multi-objectif.
 
@@ -14,7 +14,7 @@ Le simulateur permet de comparer des **métaheuristiques Pareto-basées** et des
 Le projet vise à :
 
 * Modéliser un **problème de workflow scheduling** dans un contexte Edge–Fog–Cloud
-* Décider **quel nœud exécute quelle tâche**
+* Décider **quel noeud exécute quelle tâche**
 * Optimiser **plusieurs objectifs simultanément** :
 
     * Temps d’exécution total (makespan)
@@ -30,12 +30,12 @@ Le projet vise à :
 * **Entrée**
 
     * Un workflow représenté par un DAG (tâches et dépendances)
-    * Un ensemble de nœuds hétérogènes (Edge, Fog, Cloud)
+    * Un ensemble de noeuds hétérogènes (Edge, Fog, Cloud)
     * Un réseau avec latences et bandes passantes
 
 * **Variable de décision**
 
-    * Affectation des tâches aux nœuds de calcul
+    * Affectation des tâches aux noeuds de calcul
 
 * **Fonctions objectif**
 
@@ -66,7 +66,7 @@ Chaque algorithme produit un **front de Pareto** de solutions non dominées.
 
 ### Infrastructure de calcul
 
-* Trois types de nœuds :
+* Trois types de noeuds :
 
     * **Edge**
     * **Fog**
@@ -91,7 +91,7 @@ Plusieurs scénarios permettent d’étudier l’impact du réseau :
 
 Chaque scénario modifie :
 
-* la position des nœuds,
+* la position des noeuds,
 * les latences de base,
 * les bandes passantes.
 

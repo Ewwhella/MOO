@@ -3,25 +3,31 @@ package org.simulator.core;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Modèle de réseau pour représenter les liens entre les noeuds du système.
+ * Stocke les informations de latence et de bande passante entre chaque paire de noeuds.
+ */
 public class NetworkModel {
 
-    private final double costPerSecNetwork = 0.0001;
+    /** Coût par seconde pour l'utilisation du réseau (€/s) */
+    private static final double COST_PER_SEC_NETWORK = 0.0001;
 
-
+    /**
+     * Clé pour identifier de manière unique un lien directionnel entre deux noeuds.
+     */
     private static class LinkKey {
         private final String from;
         private final String to;
-        // valeur par défaut, ajustable
 
         LinkKey(String from, String to) {
             this.from = from;
             this.to = to;
         }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (!(o instanceof LinkKey)) return false;
-            LinkKey other = (LinkKey) o;
+            if (!(o instanceof LinkKey other)) return false;
             return from.equals(other.from) && to.equals(other.to);
         }
 
@@ -31,7 +37,10 @@ public class NetworkModel {
         }
     }
 
+    /** Map des latences pour chaque lien (en secondes) */
     private final Map<LinkKey, Double> latencySeconds = new HashMap<>();
+
+    /** Map des bandes passantes pour chaque lien (en Mo/s) */
     private final Map<LinkKey, Double> bandwidthMbps = new HashMap<>();
 
     public void setLink(String fromId, String toId, double latencySec, double bandwidthMbPerSec) {
@@ -49,6 +58,6 @@ public class NetworkModel {
     }
 
     public double getCostPerSecNetwork() {
-        return costPerSecNetwork;
+        return COST_PER_SEC_NETWORK;
     }
 }

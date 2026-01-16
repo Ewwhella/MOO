@@ -7,9 +7,19 @@ import org.simulator.core.SchedulingSolution;
 import java.io.FileWriter;
 import java.util.List;
 
+/**
+ * Classe utilitaire pour l'affichage et l'exportation des résultats d'optimisation.
+ * Fournit des méthodes pour visualiser les fronts Pareto, les métriques de performance
+ * et les informations sur la topologie réseau.
+ */
 public class ModelingUtils {
 
-    // affichage lisible du front
+    /**
+     * Affiche de manière formatée un front Pareto dans la console.
+     *
+     * @param name Nom de l'algorithme
+     * @param pareto Liste des solutions Pareto
+     */
     public static void printPareto(String name, List<SchedulingSolution> pareto) {
         System.out.println("\n=== PARETO SOLUTIONS (" + name + ") ===");
         System.out.printf("%-4s %-12s %-15s %-12s%n", "#", "Makespan", "Cost", "Energy");
@@ -22,6 +32,15 @@ public class ModelingUtils {
         }
     }
 
+    /**
+     * Affiche les métriques de performance pour tous les algorithmes.
+     *
+     * @param js Front Pareto de MOJS
+     * @param aco Front Pareto de MO-ACO
+     * @param random Front Pareto de l'approche aléatoire
+     * @param greedy Front Pareto de l'approche gloutonne
+     * @param refPoint Point de référence pour le calcul de l'hypervolume
+     */
     public static void printMetrics(List<SchedulingSolution> js,
                                     List<SchedulingSolution> aco,
                                     List<SchedulingSolution> random,
@@ -43,6 +62,12 @@ public class ModelingUtils {
         System.out.println("GREEDY : " + ParetoMetrics.spacing(greedy));
     }
 
+    /**
+     * Exporte l'évolution de l'hypervolume au format CSV.
+     *
+     * @param hvList Liste des valeurs d'hypervolume par génération
+     * @param filename Chemin du fichier de sortie
+     */
     public static void exportHypervolumeCSV(List<Double> hvList, String filename) {
         try (FileWriter fw = new FileWriter(filename)) {
             fw.write("generation,hypervolume\n");
@@ -54,6 +79,11 @@ public class ModelingUtils {
         }
     }
 
+    /**
+     * Affiche un résumé des caractéristiques des noeuds principaux.
+     *
+     * @param nodes Liste des noeuds de l'infrastructure
+     */
     public static void printNodeSummary(List<Node> nodes) {
         for (Node n : nodes) {
             if ("edge1".equals(n.getId()) || "fog1".equals(n.getId()) || "cloud1".equals(n.getId())) {
@@ -69,6 +99,12 @@ public class ModelingUtils {
         }
     }
 
+    /**
+     * Affiche un contrôle de cohérence du modèle réseau en testant quelques liens.
+     *
+     * @param nodes Liste des noeuds
+     * @param net Modèle de réseau
+     */
     public static void printNetworkSanity(List<Node> nodes, NetworkModel net) {
         Node edge1 = null, fog1 = null, cloud1 = null;
 

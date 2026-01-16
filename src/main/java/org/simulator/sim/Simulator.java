@@ -8,19 +8,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Simulateur d'exécution de workflow.
+ * Calcule les temps d'exécution, coûts et consommation énergétique
+ * en tenant compte des dépendances, des communications réseau et de la disponibilité des ressources.
+ */
 public class Simulator {
 
-    // Simule l'exécution d'un workflow pour une affectation donnée tâche -> nœud.
-
+    /**
+     * Simule l'exécution d'un workflow pour une affectation donnée tâche -> noeud.
+     *
+     * @param tasks Liste des tâches en ordre topologique
+     * @param nodes Liste des noeuds disponibles
+     * @param assignment Map associant chaque tâche à un noeud (taskId -> nodeId)
+     * @param networkModel Modèle de réseau
+     * @return Résultat de la simulation (makespan, coût total, énergie totale)
+     */
     public static SimulationResult simulate(
             List<Task> tasks,
             List<Node> nodes,
             Map<String, String> assignment,
             NetworkModel networkModel
     ) {
-        // indexation rapide : nodeId -> Node
+        // Indexation rapide : nodeId -> Node
         Map<String, Node> nodeById = new HashMap<>();
-        // instant où chaque noeud devient disponible (fin de la dernière tâche exécutée sur ce noeud)
+        // Instant où chaque noeud devient disponible (fin de la dernière tâche exécutée)
         Map<String, Double> nodeAvailableAt = new HashMap<>();
         for (Node node : nodes) {
             nodeAvailableAt.put(node.getId(), 0.0);
@@ -30,7 +42,7 @@ public class Simulator {
             nodeById.put(node.getId(), node);
         }
 
-        // si, ci
+        // Temps de début et fin pour chaque tâche
         Map<String, Double> startTimes = new HashMap<>();
         Map<String, Double> finishTimes = new HashMap<>();
 
@@ -38,7 +50,7 @@ public class Simulator {
         double totalEnergy = 0.0;
         double makespan = 0.0;
 
-        // Parcours des tâches (on suppose la liste en ordre topologique)
+        // Parcours des tâches (ordre topologique)
         for (Task task : tasks) {
             String taskId = task.getId();
             String nodeId = assignment.get(taskId);
@@ -55,7 +67,7 @@ public class Simulator {
             // Temps de calcul sur ce noeud : work (MI) / MIPS => secondes
             double execTimeSeconds = task.getWorkMI() / node.getMips();
 
-            // Calcul du plus tôt début possible (si)
+            // Calcul du plus tôt début possible en tenant compte des dépendances
             double earliestStart = 0.0;
 
             for (Task pred : task.getPredecessors()) {
@@ -69,12 +81,12 @@ public class Simulator {
 
                 double commTime = 0.0;
                 if (!predNodeId.equals(nodeId)) {
-                    // Communication préd -> tâche courante
+                    // Communication entre noeuds différents
                     double latency = networkModel.getLatency(predNodeId, nodeId);
-                    double bandwidth = networkModel.getBandwidth(predNodeId, nodeId); // en Mo/s (MB/s)
+                    double bandwidth = networkModel.getBandwidth(predNodeId, nodeId);
 
-                    double dataMB = pred.getOutputDataMB(); // simplification : même volume pour tous les successeurs
-                    double transferTime = dataMB / bandwidth; // secondes
+                    double dataMB = pred.getOutputDataMB();
+                    double transferTime = dataMB / bandwidth;
 
                     commTime = latency + transferTime;
 
@@ -88,15 +100,14 @@ public class Simulator {
                 }
             }
 
-            // contrainte de ressource : la tâche ne peut démarrer que lorsque le noeud est libre
+            // Contrainte de ressource : la tâche ne peut démarrer que lorsque le noeud est libre
             double resourceReady = nodeAvailableAt.get(nodeId);
 
-            // startTime = max(constraint DAG + communications, disponibilité du noeud)
+            // Temps de début = max(contrainte DAG + communications, disponibilité du noeud)
             double startTime = Math.max(earliestStart, resourceReady);
 
             double finishTime = startTime + execTimeSeconds;
             nodeAvailableAt.put(nodeId, finishTime);
-
 
             startTimes.put(taskId, startTime);
             finishTimes.put(taskId, finishTime);
@@ -116,6 +127,9 @@ public class Simulator {
         return new SimulationResult(makespan, totalCost, totalEnergy);
     }
 
+    /**
+     * Résultat d'une simulation de workflow.
+     */
     public static class SimulationResult {
         private final double makespan;
         private final double totalCost;

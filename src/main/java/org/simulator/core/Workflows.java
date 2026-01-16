@@ -7,12 +7,21 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Classe utilitaire pour créer et charger différents workflows.
+ * Supporte les workflows Dam SHM (surveillance de barrage) et CyberShake (sismologie).
+ */
 public final class Workflows {
 
     private Workflows() { }
 
-    // 1) Workflow barrage – Dam SHM
-
+    /**
+     * Crée le workflow de surveillance structurelle de barrage (Dam SHM).
+     * Workflow composé de 12 tâches : acquisition de capteurs, filtrage, analyse fréquentielle,
+     * fusion de données, détection d'anomalies et prise de décision.
+     *
+     * @return Liste des tâches du workflow en ordre topologique
+     */
     public static List<Task> createDamShmWorkflow() {
 
         Task acqVib   = new Task("acq_vibration", 9000, 12);
@@ -31,7 +40,7 @@ public final class Workflows {
         Task detection= new Task("detection", 25000, 2);
         Task decision = new Task("decision", 4000, 0);
 
-        // DAG
+        // Construction du DAG
         filtVib.addPredecessor(acqVib);
         filtAco.addPredecessor(acqAco);
         filtPres.addPredecessor(acqPres);
@@ -56,8 +65,14 @@ public final class Workflows {
         return Utils.topoSort(tasks);
     }
 
-    // 2) Workflow CyberShake
-
+    /**
+     * Charge un workflow CyberShake depuis les ressources XML.
+     * CyberShake est un workflow scientifique de prédiction de risques sismiques.
+     *
+     * @param size Taille du workflow (30, 50, 100 ou 1000 tâches)
+     * @return Liste des tâches du workflow en ordre topologique
+     * @throws IllegalArgumentException Si la taille n'est pas supportée
+     */
     public static List<Task> loadCyberShake(int size) {
         String filename;
         switch (size) {
@@ -80,7 +95,13 @@ public final class Workflows {
         return loadCyberShakeFromXML(filename);
     }
 
-
+    /**
+     * Charge un workflow CyberShake depuis un fichier XML dans les ressources.
+     *
+     * @param resourceName Nom de la ressource XML
+     * @return Liste des tâches du workflow en ordre topologique
+     * @throws RuntimeException Si la ressource est introuvable ou invalide
+     */
     public static List<Task> loadCyberShakeFromXML(String resourceName) {
         try {
             // Charge la ressource depuis le classpath

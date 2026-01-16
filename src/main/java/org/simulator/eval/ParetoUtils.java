@@ -4,11 +4,20 @@ import org.simulator.core.SchedulingSolution;
 
 import java.util.*;
 
+/**
+ * Classe utilitaire pour la manipulation et la maintenance des fronts Pareto.
+ */
 public class ParetoUtils {
 
     private ParetoUtils() {}
 
-    // a domine b (minimisation)
+    /**
+     * Vérifie si la solution a domine strictement la solution b (minimisation).
+     *
+     * @param a Première solution
+     * @param b Seconde solution
+     * @return true si a domine strictement b, false sinon
+     */
     public static boolean dominates(SchedulingSolution a, SchedulingSolution b) {
         boolean strictlyBetter = false;
 
@@ -23,7 +32,17 @@ public class ParetoUtils {
         return strictlyBetter;
     }
 
-    // archive update: merge -> remove duplicates -> keep non-dominated -> truncate by crowding distance
+    /**
+     * Met a jour l'archive Pareto en fusionnant l'archive existante et la nouvelle population.
+     *
+     * Algorithme en 4 étapes :
+     * Merge -> Remove Duplicates -> Keep Non-Dominated -> Truncate by Crowding Distance
+     *
+     * @param archive Archive Pareto actuelle
+     * @param population Nouvelle population de solutions
+     * @param maxSize Taille maximale de l'archive
+     * @return Archive mise à jour avec au plus maxSize solutions non dominées
+     */
     public static List<SchedulingSolution> updateArchive(
             List<SchedulingSolution> archive,
             List<SchedulingSolution> population,
@@ -45,6 +64,12 @@ public class ParetoUtils {
         return new ArrayList<>(nd.subList(0, maxSize));
     }
 
+    /**
+     * Filtre les solutions non dominées d'un ensemble
+     *
+     * @param sols Liste des solutions a filtrer
+     * @return Liste des solutions non dominées
+     */
     public static List<SchedulingSolution> getNonDominated(List<SchedulingSolution> sols) {
         List<SchedulingSolution> nd = new ArrayList<>();
         for (int i = 0; i < sols.size(); i++) {
@@ -63,10 +88,12 @@ public class ParetoUtils {
         return nd;
     }
 
-    // -----------------------------
-    // Helpers: duplicates + crowding
-    // -----------------------------
-
+    /**
+     * Supprime les solutions avec des affectations identiques.
+     *
+     * @param sols Liste des solutions
+     * @return Liste sans doublons
+     */
     private static List<SchedulingSolution> removeDuplicateAssignments(List<SchedulingSolution> sols) {
         List<SchedulingSolution> out = new ArrayList<>();
         for (SchedulingSolution s : sols) {
@@ -79,6 +106,13 @@ public class ParetoUtils {
         return out;
     }
 
+    /**
+     * Vérifie si deux solutions ont la même affectation tache vers noeud.
+     *
+     * @param a Première solution
+     * @param b Seconde solution
+     * @return true si les affectations sont identiques, false sinon
+     */
     private static boolean sameAssignment(SchedulingSolution a, SchedulingSolution b) {
         int[] x = a.getAssignment();
         int[] y = b.getAssignment();
@@ -88,7 +122,12 @@ public class ParetoUtils {
         return true;
     }
 
-    // crowding distance on a single front (bigger = keep)
+    /**
+     * Calcule la crowding distance pour un front de solutions.
+     *
+     * @param front Liste des solutions du front
+     * @return Map associant chaque solution à sa crowding distance (bigger = keep)
+     */
     private static Map<SchedulingSolution, Double> crowdingDistance(List<SchedulingSolution> front) {
         Map<SchedulingSolution, Double> dist = new HashMap<>();
         for (SchedulingSolution s : front) dist.put(s, 0.0);
@@ -105,6 +144,15 @@ public class ParetoUtils {
         return dist;
     }
 
+    /**
+     * Calcule la contribution à la crowding distance pour un objectif donne.
+     *
+     * Formule : distance[i] += (f(i+1) - f(i-1)) / (f_max - f_min)
+     *
+     * @param front Liste des solutions
+     * @param dist Map des distances cumulées
+     * @param objIdx Index de l'objectif
+     */
     private static void crowdOnObjective(List<SchedulingSolution> front,
                                          Map<SchedulingSolution, Double> dist,
                                          int objIdx) {
@@ -133,6 +181,13 @@ public class ParetoUtils {
         }
     }
 
+    /**
+     * Récupère la valeur d'un objectif pour une solution donnee.
+     *
+     * @param s Solution
+     * @param idx Index de l'objectif
+     * @return Valeur de l'objectif
+     */
     private static double obj(SchedulingSolution s, int idx) {
         if (idx == 1) return s.getF1();
         if (idx == 2) return s.getF2();

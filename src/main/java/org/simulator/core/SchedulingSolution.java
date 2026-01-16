@@ -1,11 +1,22 @@
 package org.simulator.core;
 
+/**
+ * Représente une solution d'ordonnancement de workflow.
+ * Contient l'affectation des tâches aux noeuds et les valeurs des trois objectifs à minimiser.
+ */
 public class SchedulingSolution {
 
-    private int[] assignment; // assignment[i] = index du node pour la tâche i
-    private double f1; // makespan
-    private double f2; // cost
-    private double f3; // energy
+    /** Tableau d'affectation : assignment[i] = index du noeud pour la tâche i */
+    private int[] assignment;
+
+    /** Objectif 1 : temps d'exécution total */
+    private double f1;
+
+    /** Objectif 2 : coût total */
+    private double f2;
+
+    /** Objectif 3 : consommation énergétique totale */
+    private double f3;
 
     public SchedulingSolution(int[] assignment) {
         this.assignment = assignment;
@@ -27,17 +38,16 @@ public class SchedulingSolution {
         return f3;
     }
 
+    /**
+     * Définit les valeurs des trois objectifs de la solution.
+     *
+     * @param f1 Makespan
+     * @param f2 Coût total
+     * @param f3 Énergie totale
+     */
     public void setObjectives(double f1, double f2, double f3) {
         this.f1 = f1;
         this.f2 = f2;
         this.f3 = f3;
-    }
-
-    public SchedulingSolution copy() {
-        int[] newA = new int[assignment.length];
-        System.arraycopy(assignment, 0, newA, 0, assignment.length);
-        SchedulingSolution c = new SchedulingSolution(newA);
-        c.setObjectives(f1, f2, f3);
-        return c;
     }
 }

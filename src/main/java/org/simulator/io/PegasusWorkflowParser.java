@@ -10,22 +10,46 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.*;
 
+/**
+ * Parseur de workflows au format Pegasus DAX tels que CyberShake.
+ */
 public final class PegasusWorkflowParser {
 
     private static final double DEFAULT_RUNTIME_TO_MI = 10000.0;
 
     private PegasusWorkflowParser() {}
 
+    /**
+     * Parse une chaine en double.
+     * Gere les valeurs nulles, vides et les séparateurs.
+     *
+     * @param s Chaine a parser
+     * @return Valeur numérique ou 0.0 si invalide
+     */
     private static double parseDoubleSafe(String s) {
         if (s == null || s.isEmpty()) return 0.0;
         return Double.parseDouble(s.replace(',', '.'));
     }
 
-    // 1) Fichier classique
+    /**
+     * Charge un workflow depuis un fichier Pegasus DAX avec le facteur de conversion par défaut.
+     *
+     * @param path Chemin vers le fichier XML
+     * @return Liste des taches en ordre topologique
+     * @throws RuntimeException Si le fichier est introuvable ou invalide
+     */
     public static List<Task> loadFromPegasusWorkflow(String path) {
         return loadFromPegasusWorkflow(path, DEFAULT_RUNTIME_TO_MI);
     }
 
+    /**
+     * Charge un workflow depuis un fichier Pegasus DAX avec un facteur de conversion personnalisé.
+     *
+     * @param path Chemin vers le fichier XML
+     * @param runtimeToMiFactor Facteur multiplicatif runtime (s) vers MI
+     * @return Liste des taches en ordre topologique
+     * @throws RuntimeException Si le parsing echoue
+     */
     public static List<Task> loadFromPegasusWorkflow(String path, double runtimeToMiFactor) {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
@@ -39,12 +63,26 @@ public final class PegasusWorkflowParser {
         }
     }
 
-    // 2) Chargement depuis InputStream (classpath, jar, IDE)
-
+    /**
+     * Charge un workflow depuis un flux InputStream.
+     * Permet de charger des workflows embarqués dans le JAR ou le classpath.
+     *
+     * @param is Flux d'entree XML
+     * @return Liste des taches en ordre topologique
+     * @throws RuntimeException Si le flux est invalide
+     */
     public static List<Task> loadFromStream(InputStream is) {
         return loadFromStream(is, DEFAULT_RUNTIME_TO_MI);
     }
 
+    /**
+     * Charge un workflow depuis un flux InputStream avec un facteur de conversion personnalisé.
+     *
+     * @param is Flux d'entree XML
+     * @param runtimeToMiFactor Facteur multiplicatif runtime (s) vers MI
+     * @return Liste des taches en ordre topologique
+     * @throws RuntimeException Si le parsing echoue
+     */
     public static List<Task> loadFromStream(InputStream is, double runtimeToMiFactor) {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
@@ -58,9 +96,19 @@ public final class PegasusWorkflowParser {
         }
     }
 
-
-    // 3) Parser DOM commun pour fichier + stream
-
+    /**
+     * Parse le document XML et construit la liste des taches avec leurs dependances.
+     *
+     * Algorithme en trois etapes :
+     * 1. Extraction des jobs : creation des objets Task avec charge de calcul et taille de sortie
+     * 2. Construction du DAG : etablissement des relations de dependance entre taches
+     * 3. Tri topologique : ordonnancement des taches pour respecter les dependances
+     *
+     * @param doc Document XML
+     * @param runtimeToMiFactor Facteur de conversion runtime vers MI
+     * @return Liste des taches triees topologiquement
+     * @throws IllegalStateException Si le workflow contient des references invalides
+     */
     private static List<Task> parseDocument(Document doc, double runtimeToMiFactor) {
 
         Map<String, Task> taskMap = new HashMap<>();

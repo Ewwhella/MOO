@@ -31,6 +31,16 @@ import static org.simulator.util.LoadConfig.loadYaml;
 import static org.simulator.util.PythonUtils.*;
 import static org.simulator.util.Utils.*;
 
+/**
+ * Classe principale.
+ * 
+ * Coordonne l'exécution complète des expérimentations : chargement de la configuration,
+ * génération de la topologie réseau, exécution des algorithmes d'optimisation,
+ * évaluation des performances et génération des visualisations.
+ * 
+ * Le simulateur compare quatre approches : MOJS (Jellyfish multi-objectif),
+ * MO-ACO (Ant Colony multi-objectif), Random (baseline aléatoire) et Greedy (baseline glouton).
+ */
 public class App {
 
     private static final String DEFAULT_CONFIG_PATH = "configs/experiment.yaml";
@@ -42,7 +52,7 @@ public class App {
 
     public static void main(String[] args) {
 
-        // 0) Load config
+        // Chargement de la configuration
         String configPath = (args.length > 0) ? args[0] : DEFAULT_CONFIG_PATH;
         RunConfig cfg = loadYaml(configPath);
 
@@ -67,9 +77,9 @@ public class App {
 
         // 4) Scenario
         List<TopologyScenario> scenarios = resolveScenarios(cfg.scenarios);
-        TopologyScenario scenario = (scenarios == null || scenarios.isEmpty())
+        TopologyScenario scenario = scenarios.isEmpty()
                 ? TopologyScenario.DEFAULT
-                : scenarios.get(0);
+                : scenarios.getFirst();
 
         System.out.println("Workflow Simulator – Multi-Objective Scheduling");
         System.out.println("Config: " + Paths.get(configPath).toAbsolutePath());
@@ -101,7 +111,7 @@ public class App {
         Path experimentRoot = Paths.get(RESULTS_ROOT, experimentFolderName);
         ensureDir(experimentRoot);
 
-        // Scenario folder (single)
+        // Scenario folder
         Path scenarioDir = experimentRoot.resolve(scenario.name());
         ensureDir(scenarioDir);
 
@@ -248,37 +258,17 @@ public class App {
 
             double totalRunSec = secondsSince(t0);
 
-            double bestF1JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
-            double bestF2JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
-            double bestF3JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
-
-            double bestF1ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
-            double bestF2ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
-            double bestF3ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
-
-            double bestF1R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
-            double bestF2R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
-            double bestF3R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
-
-            double bestF1G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
-            double bestF2G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
-            double bestF3G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
-
             appendScenarioSummary(
                     summaryCsv,
                     runIdx, runSeed,
                     refPoint,
                     paretoJS.size(), paretoACO.size(), paretoRandom.size(), paretoGreedy.size(),
                     hvJS, hvACO, hvR, hvG,
-                    bestF1JS, bestF2JS, bestF3JS,
-                    bestF1ACO, bestF2ACO, bestF3ACO,
-                    bestF1R, bestF2R, bestF3R,
-                    bestF1G, bestF2G, bestF3G,
                     mojsSec, acoSec, randomSec, greedySec,
                     totalRunSec
             );
 
-            // 7. Plots python
+            // 7. Génération des graphiques via Python
             if (canPlot) {
                 boolean ok = runPythonPlot(runDir, pyScript);
                 if (!ok) {
@@ -296,7 +286,7 @@ public class App {
         System.out.println("Global runtime = " + formatSeconds(globalStart));
         System.out.println("Results root = " + experimentRoot.toAbsolutePath());
 
-        // 8) Agrégation
+        // 8. Agrégation des résultats multi-runs
         Path aggregateScript = Paths.get(PY_AGGREGATE_SCRIPT);
         if (Files.exists(aggregateScript)) {
             System.out.println("\nRunning aggregation on scenario folder...");
@@ -310,9 +300,15 @@ public class App {
         }
     }
 
-    // =========================
-    // Nodes builder
-    // =========================
+    /**
+     * Construit la liste des noeuds pour un scénario topologique donné.
+     * Génère les noeuds Edge, Fog et Cloud avec placement géographique aléatoire.
+
+     * @param scenario Scénario topologique définissant les positions et variabilités
+     * @param seed Seed aléatoire pour le placement des noeuds
+     * @param cfg Configuration des caractéristiques des noeuds
+     * @return Liste des noeuds générés
+     * */
     private static List<Node> buildNodesForScenario(TopologyScenario scenario, long seed, RunConfig cfg) {
 
         List<Node> nodes = new ArrayList<>();

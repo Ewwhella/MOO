@@ -8,8 +8,18 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+/**
+ * Classe utilitaire pour charger la configuration d'expérimentation depuis un fichier YAML.
+ */
 public class LoadConfig {
 
+    /**
+     * Charge et valide la configuration depuis un fichier YAML.
+     *
+     * @param path Chemin vers le fichier de configuration
+     * @return Configuration désérialisée et validée
+     * @throws RuntimeException Si le fichier est introuvable, invalide ou vide
+     */
     public static RunConfig loadYaml(String path) {
         try (InputStream in = Files.newInputStream(Paths.get(path))) {
             LoaderOptions options = new LoaderOptions();

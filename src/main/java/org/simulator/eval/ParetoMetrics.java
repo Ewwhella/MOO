@@ -11,16 +11,28 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * Classe fournissant les métriques pour l'évaluation des fronts Pareto.
+ * 
+ * Cette classe implémente deux métriques principales :
+ * - Hypervolume : Volume de l'espace des objectifs dominé par le front Pareto
+ * - Spacing : Uniformité de la distribution des solutions le long du front
+ */
 public class ParetoMetrics {
 
-    // -----------------------------
-    // Hypervolume exact 3D (minimisation)
-    // -----------------------------
+    /**
+     * Calcule l'hypervolume exact en 3D pour un ensemble de solutions.
+     * 
+     * @param sols Liste des solutions du front Pareto
+     * @param ref Point de reference [f1_max, f2_max, f3_max]
+     * @return Valeur de l'hypervolume
+     * @throws IllegalArgumentException Si le point de reference n'a pas 3 dimensions
+     */
     public static double hypervolume(List<SchedulingSolution> sols, double[] ref) {
         if (sols == null || sols.isEmpty()) return 0.0;
         if (ref == null || ref.length != 3) throw new IllegalArgumentException("refPoint must be [3]");
 
-        // Transform to maximization space: x = ref - f (must be > 0)
+        // Transformation vers l'espace de maximisation : x = ref - f (doit etre > 0)
         List<double[]> pts = new ArrayList<>();
         for (SchedulingSolution s : sols) {
             double x = ref[0] - s.getF1();
@@ -32,7 +44,7 @@ public class ParetoMetrics {
 
         pts = nonDominatedMax3D(pts);
 
-        // Sort by x desc
+        // Tri par x décroissant
         pts.sort((a, b) -> Double.compare(b[0], a[0]));
 
         double hv = 0.0;
@@ -51,6 +63,12 @@ public class ParetoMetrics {
         return hv;
     }
 
+    /**
+     * Filtre les points non dominés en 3D (maximisation).
+     * 
+     * @param pts Liste de points a filtrer
+     * @return Liste des points non dominés
+     */
     private static List<double[]> nonDominatedMax3D(List<double[]> pts) {
         List<double[]> nd = new ArrayList<>();
         for (int i = 0; i < pts.size(); i++) {
@@ -65,6 +83,13 @@ public class ParetoMetrics {
         return nd;
     }
 
+    /**
+     * Vérifie si le point a domine strictement le point b en 3D (maximisation).
+     * 
+     * @param a Premier point
+     * @param b Second point
+     * @return true si a domine strictement b, false sinon
+     */
     private static boolean dominatesMax3D(double[] a, double[] b) {
         boolean strictly = false;
         if (a[0] < b[0]) return false;
@@ -76,7 +101,12 @@ public class ParetoMetrics {
         return strictly;
     }
 
-    // Exact HV 2D (max) for rectangles [0,y]x[0,z]
+    /**
+     * Calcul exact de l'hypervolume 2D pour des rectangles (maximisation).
+     * 
+     * @param yz Liste de points dans l'espace 2D
+     * @return Aire totale dominée
+     */
     private static double hypervolume2DMax(List<double[]> yz) {
         if (yz.isEmpty()) return 0.0;
 
@@ -101,6 +131,12 @@ public class ParetoMetrics {
         return area;
     }
 
+    /**
+     * Filtre les points non dominés en 2D (maximisation).
+     * 
+     * @param pts Liste de points a filtrer
+     * @return Liste des points non dominés
+     */
     private static List<double[]> nonDominatedMax2D(List<double[]> pts) {
         List<double[]> nd = new ArrayList<>();
         for (int i = 0; i < pts.size(); i++) {
@@ -115,6 +151,13 @@ public class ParetoMetrics {
         return nd;
     }
 
+    /**
+     * Vérifie si le point a domine strictement le point b en 2D (maximisation).
+     * 
+     * @param a Premier point
+     * @param b Second point
+     * @return true si a domine strictement b, false sinon
+     */
     private static boolean dominatesMax2D(double[] a, double[] b) {
         boolean strictly = false;
         if (a[0] < b[0]) return false;
@@ -124,9 +167,13 @@ public class ParetoMetrics {
         return strictly;
     }
 
-    // -----------------------------
-    // Spacing (inchangé, OK)
-    // -----------------------------
+    /**
+     * Calcule la métrique de spacing pour mesurer l'uniformité de distribution du front.
+     * Un spacing faible indique une meilleure distribution des solutions.
+     * 
+     * @param sols Liste des solutions du front Pareto
+     * @return Valeur de spacing (plus c'est faible, meilleure est la distribution)
+     */
     public static double spacing(List<SchedulingSolution> sols) {
         if (sols == null || sols.size() < 2) return 0.0;
 
@@ -156,9 +203,12 @@ public class ParetoMetrics {
         return Math.sqrt(sum / distances.size());
     }
 
-    // -----------------------------
-    // Export CSV
-    // -----------------------------
+    /**
+     * Exporte un front Pareto au format CSV.
+     * 
+     * @param sols Liste des solutions du front
+     * @param file Chemin du fichier de sortie
+     */
     public static void exportCSV(List<SchedulingSolution> sols, String file) {
         try (FileWriter fw = new FileWriter(file)) {
             fw.write("f1_makespan,f2_cost,f3_energy\n");
@@ -170,9 +220,16 @@ public class ParetoMetrics {
         }
     }
 
-    // -----------------------------
-    // Auto ref point
-    // -----------------------------
+    /**
+     * Calcule automatiquement un point de reference pour l'hypervolume.
+     * Génère des solutions aléatoires et prend les maxima des objectifs avec une marge de 10%.
+     * 
+     * @param tasks Liste des taches du workflow
+     * @param nodes Liste des noeuds disponibles
+     * @param net Modele de reseau
+     * @param rnd Generateur aléatoire
+     * @return Point de reference [f1_max, f2_max, f3_max]
+     */
     public static double[] computeAutoRefPoint(List<Task> tasks, List<Node> nodes, NetworkModel net, Random rnd) {
         RandomSelection rs = new RandomSelection(tasks, nodes, net, 100, 50, rnd);
 

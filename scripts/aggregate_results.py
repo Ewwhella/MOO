@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 def find_summary_csvs(root_dir: str):
     """
     Cherche tous les fichiers 'summary.csv' sous root_dir.
-    Structure attendue typique :
-      results/exp_<workflow>_<timestamp>/<SCENARIO>/summary.csv
     """
     summary_paths = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -20,8 +18,6 @@ def find_summary_csvs(root_dir: str):
 def parse_metadata_from_path(summary_csv_path: str):
     """
     Extrait experiment, workflow, scenario depuis le chemin.
-    Exemple :
-      results/exp_CyberShake-1000_2026-01-15_10-22-33/DEFAULT/summary.csv
     """
     scenario_dir = os.path.dirname(summary_csv_path)
     experiment_dir = os.path.dirname(scenario_dir)
@@ -74,10 +70,6 @@ def barplot_one_metric(algo_labels, values, ylabel, title, out_path):
 
 
 def main():
-    # Usage:
-    #   python aggregate_results.py
-    #   python aggregate_results.py results
-    #   python aggregate_results.py results/exp_CyberShake-1000_2026-01-15_10-22-33
     root = sys.argv[1] if len(sys.argv) >= 2 else "results"
     root = os.path.abspath(root)
 
@@ -100,7 +92,6 @@ def main():
         if df is None or df.empty:
             continue
 
-        # Ajout meta
         df.insert(0, "scenario", meta_scenario)
         df.insert(0, "workflow", meta_workflow)
         df.insert(0, "experiment", meta_experiment)
@@ -121,10 +112,6 @@ def main():
         "ref_f1", "ref_f2", "ref_f3",
         "pareto_mojs", "pareto_aco", "pareto_random", "pareto_greedy",
         "hv_mojs", "hv_aco", "hv_random", "hv_greedy",
-        "best_f1_mojs", "best_f2_mojs", "best_f3_mojs",
-        "best_f1_aco", "best_f2_aco", "best_f3_aco",
-        "best_f1_random", "best_f2_random", "best_f3_random",
-        "best_f1_greedy", "best_f2_greedy", "best_f3_greedy",
     ]
     missing = [c for c in expected_cols if c not in full.columns]
     if missing:
@@ -149,20 +136,6 @@ def main():
 
     metrics_hv_cols = ["hv_mojs", "hv_aco", "hv_random", "hv_greedy"]
 
-    # best objectives cols
-    best_cols = {
-        "makespan": ["best_f1_mojs", "best_f1_aco", "best_f1_random", "best_f1_greedy"],
-        "cost": ["best_f2_mojs", "best_f2_aco", "best_f2_random", "best_f2_greedy"],
-        "energy": ["best_f3_mojs", "best_f3_aco", "best_f3_random", "best_f3_greedy"],
-    }
-
-    need_best = sum(best_cols.values(), [])
-    have_all_best = all(c in df_sel.columns for c in need_best)
-
-    if not have_all_best:
-        print("[WARN] Missing best_f* columns in summary.csv. "
-              "Add them in Java (appendScenarioSummary) to enable cost/makespan/energy plots.")
-
     # groupe par scenario
     for scenario, df_sc in df_sel.groupby("scenario"):
         scenario_dir = df_sc["scenario_dir"].iloc[0]
@@ -186,42 +159,6 @@ def main():
         )
         print(f"[INFO] Wrote: {hv_plot_path}")
 
-        # 3) Cost / Makespan / Energy mean by algo
-        if have_all_best:
-            makespan_vals = [mean_col(df_sc, c) for c in best_cols["makespan"]]
-            cost_vals = [mean_col(df_sc, c) for c in best_cols["cost"]]
-            energy_vals = [mean_col(df_sc, c) for c in best_cols["energy"]]
-
-            makespan_plot = os.path.join(out_dir, f"makespan_min_on_pareto_mean_by_algo.png")
-            cost_plot = os.path.join(out_dir, f"cost_min_on_pareto_mean_by_algo.png")
-            energy_plot = os.path.join(out_dir, f"energy_min_on_pareto_mean_by_algo.png")
-
-            barplot_one_metric(
-                algo_labels,
-                makespan_vals,
-                ylabel="Makespan (min on Pareto), mean over runs",
-                title=f"Makespan (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
-                out_path=makespan_plot
-            )
-            print(f"[INFO] Wrote: {makespan_plot}")
-
-            barplot_one_metric(
-                algo_labels,
-                cost_vals,
-                ylabel="Cost (min on Pareto), mean over runs",
-                title=f"Cost (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
-                out_path=cost_plot
-            )
-            print(f"[INFO] Wrote: {cost_plot}")
-
-            barplot_one_metric(
-                algo_labels,
-                energy_vals,
-                ylabel="Energy (min on Pareto), mean over runs",
-                title=f"Energy (min on Pareto) mean by algorithm ({selected_experiment} | {scenario})",
-                out_path=energy_plot
-            )
-            print(f"[INFO] Wrote: {energy_plot}")
 
     print("\n[OK] Aggregation done.")
 

@@ -3,6 +3,12 @@ package org.simulator.sim;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Scénarios topologiques prédéfinis pour les expérimentations.
+ *
+ * Les scénarios permettent d'évaluer les performances des algorithmes dans différents contextes :
+ * cloud proche ou distant, fog dense, réseau degradé, etc.
+ */
 public enum TopologyScenario {
 
     DEFAULT(
@@ -86,6 +92,27 @@ public enum TopologyScenario {
     public final double bwFogCloudMBps;
     public final double bwEdgeCloudMBps;
 
+    /**
+     * Constructeur d'un scenario topologique.
+     *
+     * @param damX Coordonnee X de la zone dam
+     * @param damY Coordonnee Y de la zone dam
+     * @param fogX Coordonnee X de la zone fog
+     * @param fogY Coordonnee Y de la zone fog
+     * @param cloudX Coordonnee X de la zone cloud
+     * @param cloudY Coordonnee Y de la zone cloud
+     * @param edgeJitterKm Variabilite du placement des noeuds edge
+     * @param fogJitterKm Variabilite du placement des noeuds fog
+     * @param cloudJitterKm Variabilite du placement des noeuds cloud
+     * @param baseSameTierSec Latence de base entre noeuds du meme niveau
+     * @param baseEdgeFogSec Latence de base edge-fog
+     * @param baseFogCloudSec Latence de base fog-cloud
+     * @param baseEdgeCloudSec Latence de base edge-cloud
+     * @param bwSameTierMBps Bande passante entre noeuds du meme niveau
+     * @param bwEdgeFogMBps Bande passante edge-fog
+     * @param bwFogCloudMBps Bande passante fog-cloud
+     * @param bwEdgeCloudMBps Bande passante edge-cloud
+     */
     TopologyScenario(
             double damX, double damY,
             double fogX, double fogY,
@@ -116,6 +143,11 @@ public enum TopologyScenario {
         this.bwEdgeCloudMBps = bwEdgeCloudMBps;
     }
 
+    /**
+     * Applique les paramètres de ce scénario aux paramètres du constructeur de topologie.
+     *
+     * @param tp Paramètres du constructeur de topologie à modifier
+     */
     public void applyTo(TopologyBuilder.Params tp) {
         tp.baseSameTier = baseSameTierSec;
         tp.baseEdgeFog = baseEdgeFogSec;
@@ -128,6 +160,13 @@ public enum TopologyScenario {
         tp.bwEdgeCloudMBps = bwEdgeCloudMBps;
     }
 
+    /**
+     * Résout une liste de noms de scénarios en objets TopologyScenario.
+     * Si la liste est vide ou nulle, retourne le scénario par défaut.
+     *
+     * @param scenarioNames Liste des noms de scénarios
+     * @return Liste des scénarios correspondants
+     */
     public static List<TopologyScenario> resolveScenarios(List<String> scenarioNames) {
         List<TopologyScenario> out = new ArrayList<>();
         if (scenarioNames == null || scenarioNames.isEmpty()) {
