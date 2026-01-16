@@ -81,6 +81,10 @@ public class Utils {
             Files.write(summaryCsv, ("run,seed,ref_f1,ref_f2,ref_f3,"
                     + "pareto_mojs,pareto_aco,pareto_random,pareto_greedy,"
                     + "hv_mojs,hv_aco,hv_random,hv_greedy,"
+                    + "best_f1_mojs,best_f2_mojs,best_f3_mojs,"
+                    + "best_f1_aco,best_f2_aco,best_f3_aco,"
+                    + "best_f1_random,best_f2_random,best_f3_random,"
+                    + "best_f1_greedy,best_f2_greedy,best_f3_greedy,"
                     + "time_mojs_s,time_aco_s,time_random_s,time_greedy_s,time_total_s\n").getBytes());
         } catch (IOException e) {
             throw new RuntimeException("Failed to init summary CSV: " + summaryCsv, e);
@@ -93,6 +97,11 @@ public class Utils {
             double[] ref,
             int szJS, int szACO, int szR, int szG,
             double hvJS, double hvACO, double hvR, double hvG,
+            double bestF1JS, double bestF2JS, double bestF3JS,
+            double bestF1ACO, double bestF2ACO, double bestF3ACO,
+            double bestF1R, double bestF2R, double bestF3R,
+            double bestF1G, double bestF2G, double bestF3G,
+
             double tJS, double tACO, double tR, double tG,
             double tTotal
     ) {
@@ -100,6 +109,10 @@ public class Utils {
                 + ref[0] + "," + ref[1] + "," + ref[2] + ","
                 + szJS + "," + szACO + "," + szR + "," + szG + ","
                 + hvJS + "," + hvACO + "," + hvR + "," + hvG + ","
+                + bestF1JS + "," + bestF2JS + "," + bestF3JS + ","
+                + bestF1ACO + "," + bestF2ACO + "," + bestF3ACO + ","
+                + bestF1R + "," + bestF2R + "," + bestF3R + ","
+                + bestF1G + "," + bestF2G + "," + bestF3G + ","
                 + tJS + "," + tACO + "," + tR + "," + tG + "," + tTotal
                 + "\n";
         try {

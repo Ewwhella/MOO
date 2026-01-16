@@ -33,10 +33,8 @@ import static org.simulator.util.Utils.*;
 
 public class App {
 
-    // Chemin du fichier YAML
     private static final String DEFAULT_CONFIG_PATH = "configs/experiment.yaml";
 
-    // Dossiers
     private static final String RESULTS_ROOT = "results";
     private static final String PY_SCRIPT_PATH_PRIMARY = "scripts/plot_pareto.py";
     private static final String PY_SCRIPT_PATH_FALLBACK = "plot_pareto.py";
@@ -58,7 +56,7 @@ public class App {
 
         // 2) Execution
         long baseSeed = cfg.execution.base_seed;
-        int runsPerScenario = cfg.execution.runs_per_scenario;
+        int runs = cfg.execution.runs;
 
         // 3) Network
         double propagationSpeedKmPerSec = cfg.network.propagation_speed_km_per_sec;
@@ -67,15 +65,19 @@ public class App {
         double networkJitterMaxSec = cfg.network.variability.latency_jitter_max_sec;
         double networkBwJitterRatio = cfg.network.variability.bandwidth_jitter_ratio;
 
-        // 4) Scenarios
+        // 4) Scenario
         List<TopologyScenario> scenarios = resolveScenarios(cfg.scenarios);
+        TopologyScenario scenario = (scenarios == null || scenarios.isEmpty())
+                ? TopologyScenario.DEFAULT
+                : scenarios.get(0);
 
-        System.out.println("Workflow Simulator – Multi-Objective Scheduling (Batch)");
+        System.out.println("Workflow Simulator – Multi-Objective Scheduling");
         System.out.println("Config: " + Paths.get(configPath).toAbsolutePath());
         System.out.println("Workflow: " + workflowTag);
         System.out.println("Experiment: " + experimentFolderName);
+        System.out.println("Scenario: " + scenario.name());
         System.out.println("Base seed: " + baseSeed);
-        System.out.println("Runs/scenario: " + runsPerScenario);
+        System.out.println("Runs: " + runs);
         System.out.println("Network variability: " + (enableNetworkVariability
                 ? ("ON (jitterMaxSec=" + networkJitterMaxSec + "s, bwJitterRatio=" + networkBwJitterRatio + ")")
                 : "OFF"));
@@ -99,9 +101,14 @@ public class App {
         Path experimentRoot = Paths.get(RESULTS_ROOT, experimentFolderName);
         ensureDir(experimentRoot);
 
-        System.out.println("\nResults root = " + experimentRoot.toAbsolutePath());
+        // Scenario folder (single)
+        Path scenarioDir = experimentRoot.resolve(scenario.name());
+        ensureDir(scenarioDir);
 
-        // Python script path
+        System.out.println("\nResults root = " + experimentRoot.toAbsolutePath());
+        System.out.println("Scenario dir = " + scenarioDir.toAbsolutePath());
+
+        // Python plot script path
         Path pyScript = pickPythonScript(Paths.get(PY_SCRIPT_PATH_PRIMARY), Paths.get(PY_SCRIPT_PATH_FALLBACK));
         boolean canPlot = (pyScript != null);
         if (!canPlot) {
@@ -111,178 +118,191 @@ public class App {
             System.out.println("[INFO] Using plot script: " + pyScript.toAbsolutePath());
         }
 
-        // 1) Boucle scénarios
-        for (TopologyScenario scenario : scenarios) {
+        System.out.println("\n==============================================");
+        System.out.println("TOPOLOGY SCENARIO: " + scenario.name());
+        System.out.println("Zone centers (km): dam=(" + scenario.damX + "," + scenario.damY + "), fog=("
+                + scenario.fogX + "," + scenario.fogY + "), cloud=(" + scenario.cloudX + "," + scenario.cloudY + ")");
+        System.out.println("Placement jitter (km): edge=" + scenario.edgeJitterKm + ", fog=" + scenario.fogJitterKm + ", cloud=" + scenario.cloudJitterKm);
+        System.out.println("==============================================");
 
-            System.out.println("\n==============================================");
-            System.out.println("TOPOLOGY SCENARIO: " + scenario.name());
-            System.out.println("Zone centers (km): dam=(" + scenario.damX + "," + scenario.damY + "), fog=("
-                    + scenario.fogX + "," + scenario.fogY + "), cloud=(" + scenario.cloudX + "," + scenario.cloudY + ")");
-            System.out.println("Placement jitter (km): edge=" + scenario.edgeJitterKm + ", fog=" + scenario.fogJitterKm + ", cloud=" + scenario.cloudJitterKm);
-            System.out.println("==============================================");
+        // summary CSV
+        Path summaryCsv = scenarioDir.resolve("summary.csv");
+        initScenarioSummary(summaryCsv);
 
-            Path scenarioDir = experimentRoot.resolve(scenario.name());
-            ensureDir(scenarioDir);
+        // Runs
+        for (int runIdx = 1; runIdx <= runs; runIdx++) {
 
-            // summary CSV
-            Path summaryCsv = scenarioDir.resolve("summary.csv");
-            initScenarioSummary(summaryCsv);
+            long runSeed = baseSeed + (runIdx - 1);
+            Path runDir = scenarioDir.resolve(String.format("run_%02d_seed_%d", runIdx, runSeed));
+            ensureDir(runDir);
 
-            // 2) Runs multiples
-            for (int runIdx = 1; runIdx <= runsPerScenario; runIdx++) {
+            System.out.println("\n--- RUN " + runIdx + "/" + runs
+                    + " | scenario=" + scenario.name()
+                    + " | seed=" + runSeed
+                    + " | out=" + runDir.toAbsolutePath());
 
-                long runSeed = baseSeed + (runIdx - 1);
-                Path runDir = scenarioDir.resolve(String.format("run_%02d_seed_%d", runIdx, runSeed));
-                ensureDir(runDir);
+            long t0 = System.nanoTime();
 
-                System.out.println("\n--- RUN " + runIdx + "/" + runsPerScenario
-                        + " | scenario=" + scenario.name()
-                        + " | seed=" + runSeed
-                        + " | out=" + runDir.toAbsolutePath());
+            // 1. Nodes (EDGE, FOG, CLOUD)
+            List<Node> nodes = buildNodesForScenario(scenario, runSeed, cfg);
 
-                long t0 = System.nanoTime();
+            System.out.println("\nNodes created: " + nodes.size()
+                    + " (edge=" + cfg.nodes.edge.count
+                    + ", fog=" + cfg.nodes.fog.count
+                    + ", cloud=" + cfg.nodes.cloud.count + ")");
+            printNodeSummary(nodes);
 
-                // 1. Nodes (EDGE, FOG, CLOUD)
-                List<Node> nodes = buildNodesForScenario(scenario, runSeed, cfg);
+            // 2. Network Model (latence géographique + variabilité optionnelle)
+            TopologyBuilder.Params tp = new TopologyBuilder.Params();
+            tp.seed = runSeed;
+            tp.propagationSpeedKmPerSec = propagationSpeedKmPerSec;
 
-                System.out.println("\nNodes created: " + nodes.size()
-                        + " (edge=" + cfg.nodes.edge.count
-                        + ", fog=" + cfg.nodes.fog.count
-                        + ", cloud=" + cfg.nodes.cloud.count + ")");
-                printNodeSummary(nodes);
+            scenario.applyTo(tp);
 
-                // 2. Network Model (latence géographique + variabilité optionnelle)
-                TopologyBuilder.Params tp = new TopologyBuilder.Params();
-                tp.seed = runSeed;
-                tp.propagationSpeedKmPerSec = propagationSpeedKmPerSec;
-
-                // presets latences/bw par scénario
-                scenario.applyTo(tp);
-
-                if (enableNetworkVariability) {
-                    tp.jitterMaxSec = networkJitterMaxSec;
-                    tp.bwJitterRatio = networkBwJitterRatio;
-                } else {
-                    tp.jitterMaxSec = 0.0;
-                    tp.bwJitterRatio = 0.0;
-                }
-
-                NetworkModel net = TopologyBuilder.build(nodes, tp);
-
-                System.out.println("\nNetwork model built:");
-                System.out.println("  propagationSpeedKmPerSec = " + tp.propagationSpeedKmPerSec);
-                System.out.println("  baseLatenciesSec = {sameTier=" + tp.baseSameTier
-                        + ", edgeFog=" + tp.baseEdgeFog
-                        + ", fogCloud=" + tp.baseFogCloud
-                        + ", edgeCloud=" + tp.baseEdgeCloud + "}");
-                System.out.println("  bandwidthMBps = {sameTier=" + tp.bwSameTierMBps
-                        + ", edgeFog=" + tp.bwEdgeFogMBps
-                        + ", fogCloud=" + tp.bwFogCloudMBps
-                        + ", edgeCloud=" + tp.bwEdgeCloudMBps + "}");
-                System.out.println("  jitterMaxSec = " + tp.jitterMaxSec);
-                System.out.println("  bwJitterRatio = " + tp.bwJitterRatio);
-
-                printNetworkSanity(nodes, net);
-
-                // 3. RefPoint
-                double[] refPoint = ParetoMetrics.computeAutoRefPoint(tasks, nodes, net);
-                System.out.println("\nAuto-refPoint = ["
-                        + refPoint[0] + ", "
-                        + refPoint[1] + ", "
-                        + refPoint[2] + "]");
-
-                // 4. Algorithmes
-                System.out.println("\nRunning MOJS...");
-                long start = System.nanoTime();
-                MOJellyfishOptimizer mojs =
-                        new MOJellyfishOptimizer(tasks, nodes, net,
-                                40,
-                                60,
-                                50);
-                List<SchedulingSolution> paretoJS = mojs.run(refPoint);
-                double mojsSec = secondsSince(start);
-                System.out.println("MOJS done in " + String.format("%.3f s", mojsSec));
-                ModelingUtils.exportHypervolumeCSV(mojs.getHypervolumeHistory(), runDir.resolve("hv_mojs.csv").toString());
-
-                System.out.println("\nRunning MO-ACO...");
-                start = System.nanoTime();
-                MOACOOptimizer aco =
-                        new MOACOOptimizer(tasks, nodes, net,
-                                40,
-                                60,
-                                50,
-                                0.1,
-                                1.0);
-                List<SchedulingSolution> paretoACO = aco.run(refPoint);
-                double acoSec = secondsSince(start);
-                System.out.println("MO-ACO done in " + String.format("%.3f s", acoSec));
-                ModelingUtils.exportHypervolumeCSV(aco.getHypervolumeHistory(), runDir.resolve("hv_aco.csv").toString());
-
-                System.out.println("\nRunning RANDOM baseline...");
-                start = System.nanoTime();
-                RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100, 50, new java.util.Random(42));
-                List<SchedulingSolution> paretoRandom = randomSel.run();
-                double randomSec = secondsSince(start);
-                System.out.println("RANDOM done in " + String.format("%.3f s", randomSec));
-
-                System.out.println("\nRunning GREEDY baseline...");
-                start = System.nanoTime();
-                GreedyAlgorithm greedy = new GreedyAlgorithm(tasks, nodes, net);
-                List<SchedulingSolution> paretoGreedy = greedy.run();
-                double greedySec = secondsSince(start);
-                System.out.println("GREEDY done in " + String.format("%.3f s", greedySec));
-
-                // 5. Exports CSV dans le dossier du run
-                ParetoMetrics.exportCSV(paretoJS, runDir.resolve("pareto_mojs.csv").toString());
-                ParetoMetrics.exportCSV(paretoACO, runDir.resolve("pareto_aco.csv").toString());
-                ParetoMetrics.exportCSV(paretoRandom, runDir.resolve("pareto_random.csv").toString());
-                ParetoMetrics.exportCSV(paretoGreedy, runDir.resolve("pareto_greedy.csv").toString());
-
-                System.out.println("\nCSV exported for all fronts -> " + runDir.toAbsolutePath());
-
-                // 6. Résumé + métriques
-                double hvJS = ParetoMetrics.hypervolume(paretoJS, refPoint);
-                double hvACO = ParetoMetrics.hypervolume(paretoACO, refPoint);
-                double hvR = ParetoMetrics.hypervolume(paretoRandom, refPoint);
-                double hvG = ParetoMetrics.hypervolume(paretoGreedy, refPoint);
-
-                double totalRunSec = secondsSince(t0);
-
-                appendScenarioSummary(summaryCsv,
-                        runIdx, runSeed,
-                        refPoint,
-                        paretoJS.size(), paretoACO.size(), paretoRandom.size(), paretoGreedy.size(),
-                        hvJS, hvACO, hvR, hvG,
-                        mojsSec, acoSec, randomSec, greedySec,
-                        totalRunSec
-                );
-
-                // 7. Plots python dans le dossier run
-                if (canPlot) {
-                    boolean ok = runPythonPlot(runDir, pyScript);
-                    if (!ok) {
-                        System.out.println("[WARN] Plot failed for: " + runDir.toAbsolutePath());
-                    }
-                }
-
-                System.out.println("\nRun total runtime = " + String.format("%.3f s", totalRunSec));
+            if (enableNetworkVariability) {
+                tp.jitterMaxSec = networkJitterMaxSec;
+                tp.bwJitterRatio = networkBwJitterRatio;
+            } else {
+                tp.jitterMaxSec = 0.0;
+                tp.bwJitterRatio = 0.0;
             }
 
-            System.out.println("\nScenario done: " + scenario.name());
-            System.out.println("Summary -> " + summaryCsv.toAbsolutePath());
+            NetworkModel net = TopologyBuilder.build(nodes, tp);
+
+            System.out.println("\nNetwork model built:");
+            System.out.println("  propagationSpeedKmPerSec = " + tp.propagationSpeedKmPerSec);
+            System.out.println("  baseLatenciesSec = {sameTier=" + tp.baseSameTier
+                    + ", edgeFog=" + tp.baseEdgeFog
+                    + ", fogCloud=" + tp.baseFogCloud
+                    + ", edgeCloud=" + tp.baseEdgeCloud + "}");
+            System.out.println("  bandwidthMBps = {sameTier=" + tp.bwSameTierMBps
+                    + ", edgeFog=" + tp.bwEdgeFogMBps
+                    + ", fogCloud=" + tp.bwFogCloudMBps
+                    + ", edgeCloud=" + tp.bwEdgeCloudMBps + "}");
+            System.out.println("  jitterMaxSec = " + tp.jitterMaxSec);
+            System.out.println("  bwJitterRatio = " + tp.bwJitterRatio);
+
+            printNetworkSanity(nodes, net);
+
+            // 3. RefPoint
+            double[] refPoint = ParetoMetrics.computeAutoRefPoint(tasks, nodes, net, new Random(runSeed));
+            System.out.println("\nAuto-refPoint = ["
+                    + refPoint[0] + ", "
+                    + refPoint[1] + ", "
+                    + refPoint[2] + "]");
+
+            // 4. Algorithmes
+            System.out.println("\nRunning MOJS...");
+            long start = System.nanoTime();
+            MOJellyfishOptimizer mojs =
+                    new MOJellyfishOptimizer(tasks, nodes, net,
+                            40,
+                            60,
+                            50);
+            List<SchedulingSolution> paretoJS = mojs.run(refPoint);
+            double mojsSec = secondsSince(start);
+            System.out.println("MOJS done in " + String.format("%.3f s", mojsSec));
+            ModelingUtils.exportHypervolumeCSV(mojs.getHypervolumeHistory(), runDir.resolve("hv_mojs.csv").toString());
+
+            System.out.println("\nRunning MO-ACO...");
+            start = System.nanoTime();
+            MOACOOptimizer aco =
+                    new MOACOOptimizer(tasks, nodes, net,
+                            40,
+                            60,
+                            50,
+                            0.1,
+                            1.0);
+            List<SchedulingSolution> paretoACO = aco.run(refPoint);
+            double acoSec = secondsSince(start);
+            System.out.println("MO-ACO done in " + String.format("%.3f s", acoSec));
+            ModelingUtils.exportHypervolumeCSV(aco.getHypervolumeHistory(), runDir.resolve("hv_aco.csv").toString());
+
+            System.out.println("\nRunning RANDOM baseline...");
+            start = System.nanoTime();
+            RandomSelection randomSel = new RandomSelection(tasks, nodes, net, 100, 50, new Random(runSeed));
+            List<SchedulingSolution> paretoRandom = randomSel.run();
+            double randomSec = secondsSince(start);
+            System.out.println("RANDOM done in " + String.format("%.3f s", randomSec));
+
+            System.out.println("\nRunning GREEDY baseline...");
+            start = System.nanoTime();
+            GreedyAlgorithm greedy = new GreedyAlgorithm(tasks, nodes, net);
+            List<SchedulingSolution> paretoGreedy = greedy.run();
+            double greedySec = secondsSince(start);
+            System.out.println("GREEDY done in " + String.format("%.3f s", greedySec));
+
+            // 5. Exports CSV dans le dossier du run
+            ParetoMetrics.exportCSV(paretoJS, runDir.resolve("pareto_mojs.csv").toString());
+            ParetoMetrics.exportCSV(paretoACO, runDir.resolve("pareto_aco.csv").toString());
+            ParetoMetrics.exportCSV(paretoRandom, runDir.resolve("pareto_random.csv").toString());
+            ParetoMetrics.exportCSV(paretoGreedy, runDir.resolve("pareto_greedy.csv").toString());
+
+            System.out.println("\nCSV exported for all fronts -> " + runDir.toAbsolutePath());
+
+            // 6. Résumé + métriques
+            double hvJS = ParetoMetrics.hypervolume(paretoJS, refPoint);
+            double hvACO = ParetoMetrics.hypervolume(paretoACO, refPoint);
+            double hvR = ParetoMetrics.hypervolume(paretoRandom, refPoint);
+            double hvG = ParetoMetrics.hypervolume(paretoGreedy, refPoint);
+
+            double totalRunSec = secondsSince(t0);
+
+            double bestF1JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
+            double bestF2JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
+            double bestF3JS = paretoJS.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
+
+            double bestF1ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
+            double bestF2ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
+            double bestF3ACO = paretoACO.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
+
+            double bestF1R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
+            double bestF2R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
+            double bestF3R = paretoRandom.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
+
+            double bestF1G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF1).min().orElse(Double.NaN);
+            double bestF2G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF2).min().orElse(Double.NaN);
+            double bestF3G = paretoGreedy.stream().mapToDouble(SchedulingSolution::getF3).min().orElse(Double.NaN);
+
+            appendScenarioSummary(
+                    summaryCsv,
+                    runIdx, runSeed,
+                    refPoint,
+                    paretoJS.size(), paretoACO.size(), paretoRandom.size(), paretoGreedy.size(),
+                    hvJS, hvACO, hvR, hvG,
+                    bestF1JS, bestF2JS, bestF3JS,
+                    bestF1ACO, bestF2ACO, bestF3ACO,
+                    bestF1R, bestF2R, bestF3R,
+                    bestF1G, bestF2G, bestF3G,
+                    mojsSec, acoSec, randomSec, greedySec,
+                    totalRunSec
+            );
+
+            // 7. Plots python
+            if (canPlot) {
+                boolean ok = runPythonPlot(runDir, pyScript);
+                if (!ok) {
+                    System.out.println("[WARN] Plot failed for: " + runDir.toAbsolutePath());
+                }
+            }
+
+            System.out.println("\nRun total runtime = " + String.format("%.3f s", totalRunSec));
         }
 
-        System.out.println("\nAll scenarios completed.");
+        System.out.println("\nScenario done: " + scenario.name());
+        System.out.println("Summary -> " + summaryCsv.toAbsolutePath());
+
+        System.out.println("\nAll runs completed.");
         System.out.println("Global runtime = " + formatSeconds(globalStart));
         System.out.println("Results root = " + experimentRoot.toAbsolutePath());
 
-        // 8) Agrégation globale
+        // 8) Agrégation
         Path aggregateScript = Paths.get(PY_AGGREGATE_SCRIPT);
         if (Files.exists(aggregateScript)) {
-            System.out.println("\nRunning global aggregation on experiment folder...");
-            boolean ok = runPythonAggregate(experimentRoot, aggregateScript);
+            System.out.println("\nRunning aggregation on scenario folder...");
+            boolean ok = runPythonAggregate(scenarioDir, aggregateScript);
             if (!ok) {
-                System.out.println("[WARN] Aggregation failed for: " + experimentRoot.toAbsolutePath());
+                System.out.println("[WARN] Aggregation failed for: " + scenarioDir.toAbsolutePath());
             }
         } else {
             System.out.println("[WARN] aggregate_results.py not found (expected at '"
