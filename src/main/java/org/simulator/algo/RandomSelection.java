@@ -38,8 +38,6 @@ public class RandomSelection {
         this.archiveMaxSize = archiveMaxSize;
         this.rand = (rand == null) ? new Random() : rand;
     }
-
-    // Constructeur simple si tu ne veux pas injecter Random partout
     public RandomSelection(List<Task> tasks,
                            List<Node> nodes,
                            NetworkModel net,
@@ -70,7 +68,7 @@ public class RandomSelection {
             sols.add(sol);
         }
 
-        // Archive Pareto avec taille paramétrable (plus de 50 en dur)
+        // Archive Pareto avec taille modifiable dans la config
         return ParetoUtils.updateArchive(new ArrayList<>(), sols, archiveMaxSize);
     }
 }

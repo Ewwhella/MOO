@@ -42,15 +42,15 @@ public class MOJellyfishOptimizer {
 
     // Paramètres de discrétisation (nouveau)
 
-    // Probabilité de suivre le "guide" (arrondi local) au début et à la fin
+    //Probabilité de suivre le "guide" (arrondi local) au début et à la fin
     private final double guidedProbStart = 0.85;   // au début : plus guidé
-    private final double guidedProbEnd   = 0.55;   // à la fin : plus d'exploration
+    private final double guidedProbEnd   = 0.55;   //à la fin : plus d'exploration
 
     // Proportion de tâches modifiées par itération (décroît avec t)
     private final double changeRatioMin  = 0.04;   // au minimum 4% des tâches
     private final double changeRatioMax  = 0.20;   // au début jusqu'à 20% des tâches
 
-    // Petit bruit additionnel (évite les solutions identiques)
+    // Petit bruit additionnel (évite les solutions identiques
     private final double extraMutation   = 0.03;
 
     private final Random rand;
@@ -59,7 +59,7 @@ public class MOJellyfishOptimizer {
     private final List<Node> nodes;
     private final NetworkModel network;
 
-    // Historique hypervolume (si refPoint fourni)
+    // Historique hypervolume
     private final List<Double> hypervolumeHistory = new ArrayList<>();
     public List<Double> getHypervolumeHistory() { return hypervolumeHistory; }
 
@@ -88,10 +88,6 @@ public class MOJellyfishOptimizer {
         this.rand = rand == null ? new Random() : rand;
     }
 
-    /**
-     * @param refPoint point de référence pour l'hypervolume : [refF1, refF2, refF3]
-     *                 Mettre null si on veut pas calculer l'hypervolume.
-     */
     //pipeline complet
     public List<SchedulingSolution> run(double[] refPoint) {
 
@@ -161,7 +157,7 @@ public class MOJellyfishOptimizer {
                     }
                 }
 
-                // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
+                // DISCRÉTISATION OPÉRATEUR-BASED
                 // Au lieu de faire round() sur tout le vecteur (souvent trop brutal),
                 // on modifie seulement k tâches :
                 // - soit on suit la direction suggérée par newPos (mouvement guidé)
@@ -178,11 +174,11 @@ public class MOJellyfishOptimizer {
 
             population = newPop;
 
-            // 5) Mise à jour archive Pareto (centralisée dans ParetoUtils)
+            // 5) Mise à jour archive Pareto
             List<SchedulingSolution> oldArchive = archive;
             archive = updateArchive(archive, population, archiveMaxSize);
 
-            // 6) Hypervolume (optionnel) + redémarrage partiel si stagnation
+            // 6) Hypervolume + redémarrage partiel si stagnation
             if (refPoint != null && refPoint.length == 3) {
                 double hv = org.simulator.eval.ParetoMetrics.hypervolume(archive, refPoint);
 
@@ -312,7 +308,7 @@ public class MOJellyfishOptimizer {
         return x;
     }
 
-    // DISCRÉTISATION OPÉRATEUR-BASED (nouveau)
+    // DISCRÉTISATION OPÉRATEUR-BASED
 
     /**
      * Traduit un mouvement continu (targetPos) en une nouvelle affectation discrète :
@@ -331,7 +327,7 @@ public class MOJellyfishOptimizer {
         double ratio = changeRatioMax - (changeRatioMax - changeRatioMin) * t;
         int k = Math.max(1, (int) Math.round(ratio * nTasks));
 
-        // Probabilité de suivre la suggestion (guidé) : décroît avec t
+        //Probabilité de suivre la suggestion (guidé) : décroît avec t
         double guidedProb = guidedProbStart - (guidedProbStart - guidedProbEnd) * t;
 
         for (int i = 0; i < k; i++) {
@@ -348,7 +344,7 @@ public class MOJellyfishOptimizer {
             }
         }
 
-        // Bruit additionnel léger (évite les solutions identiques)
+        // Bruit additionnel léger pour éviter les solutions identiques
         for (int i = 0; i < nTasks; i++) {
             if (rand.nextDouble() < extraMutation) {
                 next[i] = rand.nextInt(nNodes);
@@ -395,10 +391,7 @@ public class MOJellyfishOptimizer {
         }
     }
 
-    // -----------------------------
     // Redémarrage + Lévy + Gamma
-    // -----------------------------
-
     private double levySmall() {
         double u = rand.nextGaussian();
         double v = rand.nextGaussian();

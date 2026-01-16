@@ -14,13 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/**
- * Multi-Objective Ant Colony Optimization (MO-ACO)
- * Compatible avec ton architecture :
- * - une solution = int[] assignment (comme Jellyfish)
- * - evaluation via Simulator
- * - archive via ParetoUtils
- */
+//Multi-Objective Ant Colony Optimization (MO-ACO)
+
 public class MOACOOptimizer {
 
     private final List<Task> tasks;

@@ -83,7 +83,7 @@ public class GreedyAlgorithm {
                 double start = Math.max(earliestStart, resourceReady);
                 double finish = start + execTime;
 
-                // Variation coût/énergie incrémentale (compute + comm)
+                // Variation coût/énergie qui augmente (compute + comm)
                 double costDelta = execTime * candidate.getCostPerSec();
                 double energyDelta = execTime * candidate.getPowerPerSec();
 
@@ -92,7 +92,7 @@ public class GreedyAlgorithm {
                     String predNodeId = assignment.get(predId);
 
                     if (!predNodeId.equals(nodeId)) {
-                        // on recalcule le même commTime que ci-dessus pour le coût réseau
+                        // on recalcule le même commTime qu'au dessus pour le coût réseau
                         double latency = net.getLatency(predNodeId, nodeId);
                         double bandwidth = net.getBandwidth(predNodeId, nodeId);
                         double dataMB = pred.getOutputDataMB();
@@ -171,9 +171,6 @@ public class GreedyAlgorithm {
 
         SchedulingSolution sol = new SchedulingSolution(assignIdx);
         sol.setObjectives(makespan, totalCost, totalEnergy);
-
-        // Optionnel: vérifier cohérence via Simulator (debug)
-        // Simulator.SimulationResult r = Simulator.simulate(tasks, nodes, assignment, net);
 
         List<SchedulingSolution> out = new ArrayList<>();
         out.add(sol);
